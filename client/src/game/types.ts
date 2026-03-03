@@ -8,6 +8,7 @@ export type {
   GamePhase,
   PendingAction,
   GameLogEntry,
+  ChatMessage,
   GameState,
 } from '@shared/gameTypes';
 

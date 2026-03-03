@@ -8,6 +8,8 @@ import { GameOverScreen } from './GameOverScreen';
 import { GameLog } from './GameLog';
 import { TurnBanner } from './TurnBanner';
 import { ActionNotification } from './ActionNotification';
+import { GameMenu } from './GameMenu';
+import { ChatPanel } from './ChatPanel';
 import { PropertyColor } from '../types';
 import { getCompleteSets, getTotalBankValue } from '../engine';
 
@@ -97,6 +99,7 @@ export const GameBoard: React.FC = () => {
 
       <div className="bg-gray-900/90 border-b border-gray-700 px-3 py-1.5 flex items-center justify-between text-xs md:text-sm">
         <div className="flex items-center gap-3">
+          <GameMenu />
           <span className="text-yellow-500 font-black text-sm md:text-base tracking-tight">CARD TYCOON</span>
           <span className="text-gray-500">Turn {turnNumber}</span>
           {isMultiplayer && <span className="text-indigo-400 text-[10px] font-semibold px-1.5 py-0.5 bg-indigo-900/50 rounded">ONLINE</span>}
@@ -170,6 +173,7 @@ export const GameBoard: React.FC = () => {
 
       <PlayerHand />
       <ActionPanel />
+      {isMultiplayer && <ChatPanel />}
     </div>
   );
 };

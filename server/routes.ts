@@ -293,6 +293,21 @@ export async function registerRoutes(
           }
           break;
         }
+
+        case "send_chat": {
+          if (!currentRoomId) return;
+          const room = rooms.get(currentRoomId);
+          if (!room) return;
+          const chatText = (msg.text || "").slice(0, 200);
+          if (!chatText) return;
+          broadcastToRoom(room, {
+            type: "chat_message",
+            sender: playerName,
+            text: chatText,
+            timestamp: Date.now(),
+          });
+          break;
+        }
       }
     });
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   GameState,
   PropertyColor,
+  ChatMessage,
 } from './types';
 import {
   initializeGame,
@@ -18,10 +19,54 @@ import {
   getRentAmount,
 } from './engine';
 
+const SAVE_KEY = 'card_tycoon_save';
+
+function saveToLocalStorage(state: GameState) {
+  try {
+    const serializable: GameState = {
+      phase: state.phase,
+      players: state.players,
+      currentPlayerIndex: state.currentPlayerIndex,
+      drawPile: state.drawPile,
+      discardPile: state.discardPile,
+      cardsPlayedThisTurn: state.cardsPlayedThisTurn,
+      pendingAction: state.pendingAction,
+      winner: state.winner,
+      turnNumber: state.turnNumber,
+      message: state.message,
+      animatingCard: null,
+      gameLog: state.gameLog,
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serializable));
+  } catch {}
+}
+
+function loadFromLocalStorage(): GameState | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as GameState;
+  } catch {
+    return null;
+  }
+}
+
+function clearSave() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {}
+}
+
 interface CardGameStore extends GameState {
   myPlayerIndex: number;
   isMultiplayer: boolean;
   multiplayerWs: WebSocket | null;
+  chatMessages: ChatMessage[];
+  chatNextId: number;
   startGame: (playerCount: number) => void;
   draw: () => void;
   playToBank: (cardId: string) => void;
@@ -37,6 +82,25 @@ interface CardGameStore extends GameState {
   setMultiplayerState: (state: Partial<GameState>, playerIndex: number) => void;
   setMultiplayerWs: (ws: WebSocket | null) => void;
   sendMultiplayerAction: (action: any) => void;
+  saveGame: () => void;
+  loadGame: () => boolean;
+  hasSavedGame: () => boolean;
+  getSavedGameInfo: () => { turnNumber: number; playerCount: number } | null;
+  clearSavedGame: () => void;
+  returnToMenu: () => void;
+  sendChat: (text: string) => void;
+  addChatMessage: (msg: Omit<ChatMessage, 'id'>) => void;
+}
+
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function autoSave(state: GameState, isMultiplayer: boolean) {
+  if (isMultiplayer) return;
+  if (state.phase === 'menu' || state.phase === 'game_over') return;
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    saveToLocalStorage(state);
+  }, 500);
 }
 
 export const useCardGame = create<CardGameStore>((set, get) => ({
@@ -55,10 +119,14 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   myPlayerIndex: 0,
   isMultiplayer: false,
   multiplayerWs: null,
+  chatMessages: [],
+  chatNextId: 1,
 
   startGame: (playerCount: number) => {
+    clearSave();
     const state = initializeGame(playerCount);
-    set({ ...state, myPlayerIndex: 0, isMultiplayer: false });
+    set({ ...state, myPlayerIndex: 0, isMultiplayer: false, chatMessages: [], chatNextId: 1 });
+    autoSave(state, false);
   },
 
   draw: () => {
@@ -70,6 +138,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'draw') return;
     const newState = drawCards(state, 2);
     set(newState);
+    autoSave(newState, false);
   },
 
   playToBank: (cardId: string) => {
@@ -81,6 +150,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'play') return;
     const newState = playCardToBank(state, cardId);
     set(newState);
+    autoSave(newState, false);
   },
 
   playProperty: (cardId: string, color?: PropertyColor) => {
@@ -92,6 +162,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'play') return;
     const newState = playPropertyCard(state, cardId, color);
     set(newState);
+    autoSave(newState, false);
   },
 
   playAction: (cardId: string) => {
@@ -104,8 +175,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     const result = playActionCard(state, cardId);
     if ('needsTarget' in result) {
       set(result.state);
+      autoSave(result.state, false);
     } else {
       set(result);
+      autoSave(result as GameState, false);
     }
   },
 
@@ -118,6 +191,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'discard') return;
     const newState = discardCard(state, cardId);
     set(newState);
+    autoSave(newState, false);
   },
 
   endCurrentTurn: () => {
@@ -129,6 +203,11 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'play') return;
     const newState = endTurn(state);
     set(newState);
+    if (newState.phase === 'game_over') {
+      clearSave();
+    } else {
+      autoSave(newState, false);
+    }
   },
 
   selectTarget: (targetPlayerId: number, targetColor?: PropertyColor, targetCardId?: string) => {
@@ -140,6 +219,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'action_target' && state.phase !== 'forced_deal_pick') return;
     const newState = resolveTargetAction(state, targetPlayerId, targetColor, targetCardId);
     set(newState);
+    autoSave(newState, false);
   },
 
   payDebt: (cardIds: string[]) => {
@@ -153,6 +233,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (payerId === undefined) return;
     const newState = resolveDebtPayment(state, payerId, cardIds);
     set(newState);
+    autoSave(newState, false);
   },
 
   setForcedDealOffer: (color: PropertyColor, cardId: string) => {
@@ -165,14 +246,15 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     const player = state.players[state.currentPlayerIndex];
     const card = player.properties[color].find(c => c.id === cardId);
     if (!card) return;
-    set({
+    const updated = {
       pendingAction: {
         ...state.pendingAction,
         offeredProperty: { color, card },
       },
-      phase: 'action_target',
+      phase: 'action_target' as const,
       message: 'Now choose an opponent\'s property to take',
-    });
+    };
+    set(updated);
   },
 
   respondAction: (useJustSayNo: boolean) => {
@@ -184,6 +266,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.phase !== 'action_response') return;
     const newState = resolveActionResponse(state, useJustSayNo);
     set(newState);
+    autoSave(newState, false);
   },
 
   processAITurns: () => {
@@ -197,6 +280,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         const aiAction = getAIAction(state);
         const newState = resolveActionResponse(state, aiAction.useJustSayNo || false);
         set(newState);
+        autoSave(newState, false);
         return;
       }
       return;
@@ -206,17 +290,18 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (!player?.isAI) return;
 
     const aiAction = getAIAction(state);
+    let newState: GameState | null = null;
 
     switch (aiAction.action) {
       case 'play_property': {
         if (!aiAction.cardId) break;
-        const newState = playPropertyCard(state, aiAction.cardId, aiAction.targetColor);
+        newState = playPropertyCard(state, aiAction.cardId, aiAction.targetColor);
         set(newState);
         break;
       }
       case 'play_bank': {
         if (!aiAction.cardId) break;
-        const newState = playCardToBank(state, aiAction.cardId);
+        newState = playCardToBank(state, aiAction.cardId);
         set(newState);
         break;
       }
@@ -226,8 +311,8 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         if ('needsTarget' in result) {
           if (aiAction.targetPlayerId !== undefined || aiAction.targetColor) {
             const targetId = aiAction.targetPlayerId ?? state.players.find(p => p.id !== player.id)!.id;
-            const resolved = resolveTargetAction(result.state, targetId, aiAction.targetColor, aiAction.targetCardId);
-            set(resolved);
+            newState = resolveTargetAction(result.state, targetId, aiAction.targetColor, aiAction.targetCardId);
+            set(newState);
           } else {
             const rentColors = result.state.pendingAction?.card?.colors;
             if (rentColors && rentColors.length > 0) {
@@ -235,24 +320,26 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
               if (ownedColors.length > 0) {
                 const best = ownedColors.reduce((b: PropertyColor, c: PropertyColor) =>
                   getRentAmount(player, c) > getRentAmount(player, b) ? c : b, ownedColors[0]);
-                const resolved = resolveTargetAction(result.state, player.id, best);
-                set(resolved);
+                newState = resolveTargetAction(result.state, player.id, best);
+                set(newState);
               } else {
-                const endState = endTurn(result.state);
-                set(endState);
+                newState = endTurn(result.state);
+                set(newState);
               }
             } else {
               set(result.state);
+              newState = result.state;
             }
           }
         } else {
           set(result);
+          newState = result as GameState;
         }
         break;
       }
       case 'discard': {
         if (!aiAction.cardId) break;
-        const newState = discardCard(state, aiAction.cardId);
+        newState = discardCard(state, aiAction.cardId);
         set(newState);
         break;
       }
@@ -261,14 +348,22 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         const ids = aiAction.cardId.split(',');
         const payerId = state.pendingAction?.currentResponder;
         if (payerId === undefined) break;
-        const newState = resolveDebtPayment(state, payerId, ids);
+        newState = resolveDebtPayment(state, payerId, ids);
         set(newState);
         break;
       }
       case 'end_turn': {
-        const newState = endTurn(state);
+        newState = endTurn(state);
         set(newState);
         break;
+      }
+    }
+
+    if (newState) {
+      if (newState.phase === 'game_over') {
+        clearSave();
+      } else {
+        autoSave(newState, false);
       }
     }
   },
@@ -278,7 +373,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   },
 
   setMultiplayerWs: (ws: WebSocket | null) => {
-    set({ multiplayerWs: ws, isMultiplayer: ws !== null });
+    set({ multiplayerWs: ws, isMultiplayer: ws !== null, chatMessages: [], chatNextId: 1 });
   },
 
   sendMultiplayerAction: (action: any) => {
@@ -286,5 +381,85 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'game_action', action }));
     }
+  },
+
+  saveGame: () => {
+    const state = get();
+    if (state.isMultiplayer) return;
+    saveToLocalStorage(state);
+  },
+
+  loadGame: () => {
+    const saved = loadFromLocalStorage();
+    if (!saved || !saved.players || !saved.phase || !saved.drawPile) {
+      clearSave();
+      return false;
+    }
+    if (saved.phase === 'menu' || saved.phase === 'game_over') {
+      clearSave();
+      return false;
+    }
+    set({ ...saved, myPlayerIndex: 0, isMultiplayer: false, multiplayerWs: null, chatMessages: [], chatNextId: 1 });
+    return true;
+  },
+
+  hasSavedGame: () => {
+    return loadFromLocalStorage() !== null;
+  },
+
+  getSavedGameInfo: () => {
+    const saved = loadFromLocalStorage();
+    if (!saved) return null;
+    return { turnNumber: saved.turnNumber, playerCount: saved.players.length };
+  },
+
+  clearSavedGame: () => {
+    clearSave();
+  },
+
+  returnToMenu: () => {
+    const state = get();
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    if (state.multiplayerWs) {
+      state.multiplayerWs.close();
+    }
+    set({
+      phase: 'menu',
+      players: [],
+      currentPlayerIndex: 0,
+      drawPile: [],
+      discardPile: [],
+      cardsPlayedThisTurn: 0,
+      pendingAction: null,
+      winner: null,
+      turnNumber: 1,
+      message: '',
+      animatingCard: null,
+      gameLog: [],
+      myPlayerIndex: 0,
+      isMultiplayer: false,
+      multiplayerWs: null,
+      chatMessages: [],
+      chatNextId: 1,
+    });
+  },
+
+  sendChat: (text: string) => {
+    const ws = get().multiplayerWs;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'send_chat', text }));
+    }
+  },
+
+  addChatMessage: (msg: Omit<ChatMessage, 'id'>) => {
+    const state = get();
+    const id = state.chatNextId;
+    set({
+      chatMessages: [...state.chatMessages, { ...msg, id }],
+      chatNextId: id + 1,
+    });
   },
 }));

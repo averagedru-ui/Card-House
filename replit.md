@@ -21,12 +21,14 @@ client/src/
     types.ts          - Re-exports from shared + client-only types (RoomInfo)
     cards.ts          - Re-exports from shared
     engine.ts         - Re-exports from shared
-    useCardGame.ts    - Zustand store binding engine to React + multiplayer support
+    useCardGame.ts    - Zustand store binding engine to React + multiplayer + save/load + chat
     components/
       CardComponent.tsx     - Individual card rendering (property, money, action, wildcard)
-      MainMenu.tsx          - Start screen: solo vs AI or multiplayer
-      MultiplayerLobby.tsx  - Room creation/joining, lobby UI, invite link sharing
-      GameBoard.tsx         - Main game layout with AI turn processing
+      MainMenu.tsx          - Start screen: solo vs AI or multiplayer, resume saved game
+      MultiplayerLobby.tsx  - Room creation/joining, lobby UI, invite link sharing, chat relay
+      GameBoard.tsx         - Main game layout with AI turn processing, menu, chat
+      GameMenu.tsx          - In-game menu overlay (resume, save & quit, quit, profile stats)
+      ChatPanel.tsx         - Multiplayer chat panel (collapsible, unread badge)
       PlayerHand.tsx        - Player's hand with card selection and play options
       PropertyArea.tsx      - Property set display for any player
       OpponentArea.tsx      - Opponent info display
@@ -54,12 +56,24 @@ script/
 - Cards can be banked as money regardless of type
 - Just Say No defensively blocks targeted actions (Sly Deal, Deal Breaker, Forced Deal, Debt Collector, Rent)
 
+## Game Persistence
+- Solo games auto-save to localStorage (debounced 500ms)
+- Resume button on main menu shows turn number and player count
+- Save cleared on game over or quit without saving
+- Save & Quit option in in-game menu preserves state
+
 ## Multiplayer
 - WebSocket-based real-time multiplayer via `/ws` endpoint
 - Room system with 5-character codes
 - Shareable invite links (`?room=XXXXX` URL parameter)
 - Server-authoritative game state with per-player views (opponents' hands hidden)
 - 2-4 players per room
+- In-game chat via WebSocket (`send_chat` / `chat_message` message types)
+
+## In-Game Menu
+- Hamburger menu icon in game header bar
+- Options: Resume, Save & Quit (solo only), Quit/Leave
+- Profile section showing player stats (sets, bank, cards)
 
 ## Tech Stack
 - React 18, TypeScript, Tailwind CSS, Zustand, Framer Motion

@@ -83,6 +83,13 @@ export interface GameLogEntry {
   type: 'action' | 'property' | 'money' | 'system' | 'steal' | 'rent';
 }
 
+export interface ChatMessage {
+  id: number;
+  sender: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface GameState {
   phase: GamePhase;
   players: Player[];

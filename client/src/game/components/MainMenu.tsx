@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCardGame } from '../useCardGame';
 
 interface MainMenuProps {
@@ -7,7 +7,23 @@ interface MainMenuProps {
 
 export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer }) => {
   const startGame = useCardGame(s => s.startGame);
+  const loadGame = useCardGame(s => s.loadGame);
+  const getSavedGameInfo = useCardGame(s => s.getSavedGameInfo);
+  const clearSavedGame = useCardGame(s => s.clearSavedGame);
   const [playerCount, setPlayerCount] = useState(2);
+  const [savedInfo, setSavedInfo] = useState<{ turnNumber: number; playerCount: number } | null>(null);
+
+  useEffect(() => {
+    setSavedInfo(getSavedGameInfo());
+  }, []);
+
+  const handleResume = () => {
+    const success = loadGame();
+    if (!success) {
+      clearSavedGame();
+      setSavedInfo(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-950 to-gray-900 flex flex-col items-center py-8 px-4 overflow-y-auto">
@@ -31,6 +47,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer }) => {
             <li>Use <span className="text-cyan-400 font-bold">Just Say No</span> to block attacks!</li>
           </ul>
         </div>
+
+        {savedInfo && (
+          <button
+            onClick={handleResume}
+            className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-lg rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-500/30 mb-3"
+          >
+            <div className="flex flex-col items-center">
+              <span>RESUME GAME</span>
+              <span className="text-emerald-100/70 text-xs font-medium mt-0.5">
+                Turn {savedInfo.turnNumber} - {savedInfo.playerCount} Players
+              </span>
+            </div>
+          </button>
+        )}
 
         <div className="mb-4">
           <label className="text-white text-sm font-semibold mb-2 block">Solo vs AI</label>

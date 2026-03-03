@@ -17,6 +17,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   const wsRef = useRef<WebSocket | null>(null);
   const setMultiplayerWs = useCardGame(s => s.setMultiplayerWs);
   const setMultiplayerState = useCardGame(s => s.setMultiplayerState);
+  const addChatMessage = useCardGame(s => s.addChatMessage);
 
   const connectWs = useCallback((action: string, room?: string, name?: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -54,6 +55,9 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
           break;
         case 'game_update':
           setMultiplayerState(msg.gameState, msg.playerIndex);
+          break;
+        case 'chat_message':
+          addChatMessage({ sender: msg.sender, text: msg.text, timestamp: msg.timestamp });
           break;
         case 'error':
           setError(msg.message);
