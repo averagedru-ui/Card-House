@@ -13,13 +13,15 @@ import {
   endTurn,
   resolveDebtPayment,
   resolveTargetAction,
+  resolveActionResponse,
   getAIAction,
-  getCompleteSets,
   getRentAmount,
 } from './engine';
-import { PROPERTY_SETS } from './cards';
 
 interface CardGameStore extends GameState {
+  myPlayerIndex: number;
+  isMultiplayer: boolean;
+  multiplayerWs: WebSocket | null;
   startGame: (playerCount: number) => void;
   draw: () => void;
   playToBank: (cardId: string) => void;
@@ -30,7 +32,11 @@ interface CardGameStore extends GameState {
   selectTarget: (targetPlayerId: number, targetColor?: PropertyColor, targetCardId?: string) => void;
   payDebt: (cardIds: string[]) => void;
   setForcedDealOffer: (color: PropertyColor, cardId: string) => void;
+  respondAction: (useJustSayNo: boolean) => void;
   processAITurns: () => void;
+  setMultiplayerState: (state: Partial<GameState>, playerIndex: number) => void;
+  setMultiplayerWs: (ws: WebSocket | null) => void;
+  sendMultiplayerAction: (action: any) => void;
 }
 
 export const useCardGame = create<CardGameStore>((set, get) => ({
@@ -45,14 +51,22 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   turnNumber: 1,
   message: '',
   animatingCard: null,
+  gameLog: [],
+  myPlayerIndex: 0,
+  isMultiplayer: false,
+  multiplayerWs: null,
 
   startGame: (playerCount: number) => {
     const state = initializeGame(playerCount);
-    set(state);
+    set({ ...state, myPlayerIndex: 0, isMultiplayer: false });
   },
 
   draw: () => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'draw' });
+      return;
+    }
     if (state.phase !== 'draw') return;
     const newState = drawCards(state, 2);
     set(newState);
@@ -60,6 +74,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   playToBank: (cardId: string) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'play_bank', cardId });
+      return;
+    }
     if (state.phase !== 'play') return;
     const newState = playCardToBank(state, cardId);
     set(newState);
@@ -67,6 +85,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   playProperty: (cardId: string, color?: PropertyColor) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'play_property', cardId, color });
+      return;
+    }
     if (state.phase !== 'play') return;
     const newState = playPropertyCard(state, cardId, color);
     set(newState);
@@ -74,6 +96,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   playAction: (cardId: string) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'play_action', cardId });
+      return;
+    }
     if (state.phase !== 'play') return;
     const result = playActionCard(state, cardId);
     if ('needsTarget' in result) {
@@ -85,6 +111,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   discard: (cardId: string) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'discard', cardId });
+      return;
+    }
     if (state.phase !== 'discard') return;
     const newState = discardCard(state, cardId);
     set(newState);
@@ -92,6 +122,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   endCurrentTurn: () => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'end_turn' });
+      return;
+    }
     if (state.phase !== 'play') return;
     const newState = endTurn(state);
     set(newState);
@@ -99,6 +133,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   selectTarget: (targetPlayerId: number, targetColor?: PropertyColor, targetCardId?: string) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'select_target', targetPlayerId, targetColor, targetCardId });
+      return;
+    }
     if (state.phase !== 'action_target' && state.phase !== 'forced_deal_pick') return;
     const newState = resolveTargetAction(state, targetPlayerId, targetColor, targetCardId);
     set(newState);
@@ -106,6 +144,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   payDebt: (cardIds: string[]) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'pay_debt', cardIds });
+      return;
+    }
     if (state.phase !== 'pay_debt') return;
     const payerId = state.pendingAction?.currentResponder;
     if (payerId === undefined) return;
@@ -115,6 +157,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   setForcedDealOffer: (color: PropertyColor, cardId: string) => {
     const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'forced_deal_offer', color, cardId });
+      return;
+    }
     if (!state.pendingAction) return;
     const player = state.players[state.currentPlayerIndex];
     const card = player.properties[color].find(c => c.id === cardId);
@@ -129,8 +175,33 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     });
   },
 
+  respondAction: (useJustSayNo: boolean) => {
+    const state = get();
+    if (state.isMultiplayer) {
+      state.sendMultiplayerAction({ type: 'respond_action', useJustSayNo });
+      return;
+    }
+    if (state.phase !== 'action_response') return;
+    const newState = resolveActionResponse(state, useJustSayNo);
+    set(newState);
+  },
+
   processAITurns: () => {
     const state = get();
+    if (state.isMultiplayer) return;
+
+    if (state.phase === 'action_response') {
+      const responderId = state.pendingAction?.targetPlayerId;
+      const responder = state.players.find(p => p.id === responderId);
+      if (responder?.isAI) {
+        const aiAction = getAIAction(state);
+        const newState = resolveActionResponse(state, aiAction.useJustSayNo || false);
+        set(newState);
+        return;
+      }
+      return;
+    }
+
     const player = state.players[state.currentPlayerIndex];
     if (!player?.isAI) return;
 
@@ -167,7 +238,6 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
                 const resolved = resolveTargetAction(result.state, player.id, best);
                 set(resolved);
               } else {
-                set(result.state);
                 const endState = endTurn(result.state);
                 set(endState);
               }
@@ -200,6 +270,21 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         set(newState);
         break;
       }
+    }
+  },
+
+  setMultiplayerState: (serverState: Partial<GameState>, playerIndex: number) => {
+    set({ ...serverState, myPlayerIndex: playerIndex, isMultiplayer: true } as any);
+  },
+
+  setMultiplayerWs: (ws: WebSocket | null) => {
+    set({ multiplayerWs: ws, isMultiplayer: ws !== null });
+  },
+
+  sendMultiplayerAction: (action: any) => {
+    const ws = get().multiplayerWs;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'game_action', action }));
     }
   },
 }));

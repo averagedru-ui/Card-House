@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useCardGame } from '../useCardGame';
 import { PropertyColor } from '../types';
 import { PROPERTY_SETS } from '../cards';
@@ -11,14 +12,65 @@ export const ActionPanel: React.FC = () => {
   const selectTarget = useCardGame(s => s.selectTarget);
   const payDebt = useCardGame(s => s.payDebt);
   const setForcedDealOffer = useCardGame(s => s.setForcedDealOffer);
+  const respondAction = useCardGame(s => s.respondAction);
   const currentPlayerIndex = useCardGame(s => s.currentPlayerIndex);
+  const myPlayerIndex = useCardGame(s => s.myPlayerIndex);
 
   const [selectedPayCards, setSelectedPayCards] = useState<string[]>([]);
 
-  const humanPlayer = players[0];
+  const humanPlayer = players[myPlayerIndex];
   if (!humanPlayer) return null;
 
-  if (phase === 'pay_debt' && pendingAction?.currentResponder === 0) {
+  if (phase === 'action_response' && pendingAction?.targetPlayerId === myPlayerIndex) {
+    const source = players.find(p => p.id === pendingAction.sourcePlayerId);
+    const hasJSN = humanPlayer.hand.some(c => c.actionType === 'just_say_no');
+    const actionLabels: Record<string, string> = {
+      debt_collector: 'Debt Collector ($5M)',
+      sly_deal: 'Sly Deal (steal property)',
+      deal_breaker: 'Deal Breaker (steal set)',
+      forced_deal: 'Forced Deal (swap)',
+      rent: `Rent ($${pendingAction.amount}M)`,
+      birthday: 'Birthday ($2M)',
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-gray-800 rounded-2xl p-5 md:p-6 max-w-md w-full border border-red-500/30 shadow-2xl shadow-red-500/10"
+        >
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-2">🚨</div>
+            <h3 className="text-white text-xl font-bold">Incoming Action!</h3>
+            <p className="text-gray-400 text-sm mt-1">
+              {source?.name} plays <span className="text-yellow-400 font-semibold">{actionLabels[pendingAction.type] || pendingAction.type}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {hasJSN && (
+              <button
+                onClick={() => respondAction(true)}
+                className="py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-700 text-white font-bold rounded-xl hover:from-cyan-500 hover:to-blue-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg"
+              >
+                <span className="text-xl">🚫</span>
+                Play Just Say No!
+              </button>
+            )}
+            <button
+              onClick={() => respondAction(false)}
+              className="py-3 px-4 bg-gray-700 text-gray-300 font-semibold rounded-xl hover:bg-gray-600 active:scale-95 transition-all"
+            >
+              {hasJSN ? 'Accept (Don\'t Block)' : 'Accept'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (phase === 'pay_debt' && pendingAction?.currentResponder === myPlayerIndex) {
     const amount = pendingAction.amount || 0;
     const selectedTotal = selectedPayCards.reduce((sum, id) => {
       const bankCard = humanPlayer.bank.find(c => c.id === id);
@@ -37,7 +89,11 @@ export const ActionPanel: React.FC = () => {
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-lg w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-lg w-full border border-gray-600 max-h-[80vh] overflow-y-auto"
+        >
           <h3 className="text-white text-lg font-bold mb-1">Pay ${amount}M</h3>
           <p className="text-gray-400 text-sm mb-3">
             Selected: ${selectedTotal}M {selectedTotal >= amount ? '(enough!)' : `(need $${amount - selectedTotal}M more)`}
@@ -55,9 +111,9 @@ export const ActionPanel: React.FC = () => {
                         prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]
                       );
                     }}
-                    className={`px-2 py-1 rounded text-xs font-bold ${
+                    className={`px-2 py-1 rounded text-xs font-bold transition-all ${
                       selectedPayCards.includes(card.id)
-                        ? 'bg-yellow-500 text-yellow-900'
+                        ? 'bg-yellow-500 text-yellow-900 scale-105'
                         : 'bg-emerald-700 text-emerald-200 hover:bg-emerald-600'
                     }`}
                   >
@@ -85,9 +141,9 @@ export const ActionPanel: React.FC = () => {
                           prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]
                         );
                       }}
-                      className={`px-2 py-1 rounded text-xs font-medium ${
+                      className={`px-2 py-1 rounded text-xs font-medium transition-all ${
                         selectedPayCards.includes(card.id)
-                          ? 'bg-yellow-500 text-yellow-900'
+                          ? 'bg-yellow-500 text-yellow-900 scale-105'
                           : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                     >
@@ -107,9 +163,9 @@ export const ActionPanel: React.FC = () => {
                 }
               }}
               disabled={!canPay}
-              className={`flex-1 py-2 rounded-lg font-bold ${
+              className={`flex-1 py-2 rounded-lg font-bold transition-all ${
                 canPay
-                  ? 'bg-yellow-500 text-yellow-900 hover:bg-yellow-400'
+                  ? 'bg-yellow-500 text-yellow-900 hover:bg-yellow-400 active:scale-95'
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }`}
             >
@@ -127,37 +183,34 @@ export const ActionPanel: React.FC = () => {
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  if (phase === 'action_target' && currentPlayerIndex === 0 && pendingAction) {
+  if (phase === 'action_target' && currentPlayerIndex === myPlayerIndex && pendingAction) {
     if (pendingAction.type === 'debt_collector') {
-      const opponents = players.filter(p => p.id !== 0);
+      const opponents = players.filter(p => p.id !== myPlayerIndex);
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
             <h3 className="text-white text-lg font-bold mb-3">Choose a player to charge $5M</h3>
             <div className="flex flex-col gap-2">
               {opponents.map(opp => (
-                <button
-                  key={opp.id}
-                  onClick={() => selectTarget(opp.id)}
-                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center"
-                >
+                <button key={opp.id} onClick={() => selectTarget(opp.id)}
+                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <span>{opp.name}</span>
                   <span className="text-emerald-400 text-sm">Bank: ${getTotalBankValue(opp)}M</span>
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
 
     if (pendingAction.type === 'sly_deal') {
-      const opponents = players.filter(p => p.id !== 0);
+      const opponents = players.filter(p => p.id !== myPlayerIndex);
       const stealable: { playerId: number; playerName: string; color: PropertyColor; cardId: string; cardName: string }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -172,39 +225,34 @@ export const ActionPanel: React.FC = () => {
       if (stealable.length === 0) {
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
               <h3 className="text-white text-lg font-bold mb-3">No properties to steal!</h3>
-              <button onClick={() => selectTarget(0)} className="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">
-                OK
-              </button>
-            </div>
+              <button onClick={() => selectTarget(0)} className="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">OK</button>
+            </motion.div>
           </div>
         );
       }
 
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
             <h3 className="text-white text-lg font-bold mb-3">Choose a property to steal</h3>
             <div className="flex flex-col gap-1.5">
               {stealable.map(item => (
-                <button
-                  key={item.cardId}
-                  onClick={() => selectTarget(item.playerId, item.color, item.cardId)}
-                  className={`py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center`}
-                >
+                <button key={item.cardId} onClick={() => selectTarget(item.playerId, item.color, item.cardId)}
+                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <span>{item.cardName}</span>
                   <span className="text-gray-400 text-xs">{item.playerName} - {PROPERTY_SETS[item.color].label}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
 
     if (pendingAction.type === 'forced_deal' && pendingAction.offeredProperty) {
-      const opponents = players.filter(p => p.id !== 0);
+      const opponents = players.filter(p => p.id !== myPlayerIndex);
       const stealable: { playerId: number; playerName: string; color: PropertyColor; cardId: string; cardName: string }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -219,38 +267,35 @@ export const ActionPanel: React.FC = () => {
       if (stealable.length === 0) {
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
               <h3 className="text-white text-lg font-bold mb-3">No properties to swap with!</h3>
               <button onClick={() => selectTarget(0)} className="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">OK</button>
-            </div>
+            </motion.div>
           </div>
         );
       }
 
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
             <h3 className="text-white text-lg font-bold mb-1">Choose opponent's property to take</h3>
             <p className="text-gray-400 text-sm mb-3">Offering: {pendingAction.offeredProperty.card.name}</p>
             <div className="flex flex-col gap-1.5">
               {stealable.map(item => (
-                <button
-                  key={item.cardId}
-                  onClick={() => selectTarget(item.playerId, item.color, item.cardId)}
-                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center"
-                >
+                <button key={item.cardId} onClick={() => selectTarget(item.playerId, item.color, item.cardId)}
+                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <span>{item.cardName}</span>
                   <span className="text-gray-400 text-xs">{item.playerName} - {PROPERTY_SETS[item.color].label}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
 
     if (pendingAction.type === 'deal_breaker') {
-      const opponents = players.filter(p => p.id !== 0);
+      const opponents = players.filter(p => p.id !== myPlayerIndex);
       const stealableSets: { playerId: number; playerName: string; color: PropertyColor }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -262,27 +307,22 @@ export const ActionPanel: React.FC = () => {
       if (stealableSets.length === 0) {
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
               <h3 className="text-white text-lg font-bold mb-3">No complete sets to steal!</h3>
-              <button onClick={() => selectTarget(0)} className="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">
-                OK
-              </button>
-            </div>
+              <button onClick={() => selectTarget(0)} className="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">OK</button>
+            </motion.div>
           </div>
         );
       }
 
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
             <h3 className="text-white text-lg font-bold mb-3">Choose a complete set to steal</h3>
             <div className="flex flex-col gap-2">
               {stealableSets.map(item => (
-                <button
-                  key={`${item.playerId}-${item.color}`}
-                  onClick={() => selectTarget(item.playerId, item.color)}
-                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center"
-                >
+                <button key={`${item.playerId}-${item.color}`} onClick={() => selectTarget(item.playerId, item.color)}
+                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <div className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${PROPERTY_SETS[item.color].bgClass}`} />
                     <span>{PROPERTY_SETS[item.color].label} Set</span>
@@ -291,7 +331,7 @@ export const ActionPanel: React.FC = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
@@ -304,15 +344,12 @@ export const ActionPanel: React.FC = () => {
 
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
             <h3 className="text-white text-lg font-bold mb-3">Choose a color to charge rent on</h3>
             <div className="flex flex-col gap-2">
               {availableColors.map(color => (
-                <button
-                  key={color}
-                  onClick={() => selectTarget(humanPlayer.id, color)}
-                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center"
-                >
+                <button key={color} onClick={() => selectTarget(humanPlayer.id, color)}
+                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <div className="flex items-center gap-2">
                     <div className={`w-3 h-3 rounded-full ${PROPERTY_SETS[color].bgClass}`} />
                     <span>{PROPERTY_SETS[color].label}</span>
@@ -327,7 +364,7 @@ export const ActionPanel: React.FC = () => {
                 </>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
@@ -336,21 +373,18 @@ export const ActionPanel: React.FC = () => {
       const completeSets = getCompleteSets(humanPlayer).filter(c => !humanPlayer.hasHouse[c]);
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
             <h3 className="text-white text-lg font-bold mb-3">Add house to which set?</h3>
             <div className="flex flex-col gap-2">
               {completeSets.map(color => (
-                <button
-                  key={color}
-                  onClick={() => selectTarget(humanPlayer.id, color)}
-                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex items-center gap-2"
-                >
+                <button key={color} onClick={() => selectTarget(humanPlayer.id, color)}
+                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex items-center gap-2 transition-all">
                   <div className={`w-3 h-3 rounded-full ${PROPERTY_SETS[color].bgClass}`} />
                   <span>{PROPERTY_SETS[color].label}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
@@ -359,27 +393,24 @@ export const ActionPanel: React.FC = () => {
       const eligible = getCompleteSets(humanPlayer).filter(c => humanPlayer.hasHouse[c] && !humanPlayer.hasHotel[c]);
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
             <h3 className="text-white text-lg font-bold mb-3">Add hotel to which set?</h3>
             <div className="flex flex-col gap-2">
               {eligible.map(color => (
-                <button
-                  key={color}
-                  onClick={() => selectTarget(humanPlayer.id, color)}
-                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex items-center gap-2"
-                >
+                <button key={color} onClick={() => selectTarget(humanPlayer.id, color)}
+                  className="py-3 px-4 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-600 active:scale-95 flex items-center gap-2 transition-all">
                   <div className={`w-3 h-3 rounded-full ${PROPERTY_SETS[color].bgClass}`} />
                   <span>{PROPERTY_SETS[color].label}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }
   }
 
-  if (phase === 'forced_deal_pick' && currentPlayerIndex === 0 && pendingAction) {
+  if (phase === 'forced_deal_pick' && currentPlayerIndex === myPlayerIndex && pendingAction) {
     const myProperties: { color: PropertyColor; cardId: string; cardName: string }[] = [];
     for (const color of Object.keys(humanPlayer.properties) as PropertyColor[]) {
       for (const card of humanPlayer.properties[color]) {
@@ -390,15 +421,12 @@ export const ActionPanel: React.FC = () => {
     if (!pendingAction.offeredProperty) {
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600 max-h-[80vh] overflow-y-auto">
             <h3 className="text-white text-lg font-bold mb-3">Choose your property to offer</h3>
             <div className="flex flex-col gap-1.5">
               {myProperties.map(item => (
-                <button
-                  key={item.cardId}
-                  onClick={() => setForcedDealOffer(item.color, item.cardId)}
-                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center"
-                >
+                <button key={item.cardId} onClick={() => setForcedDealOffer(item.color, item.cardId)}
+                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
                   <span>{item.cardName}</span>
                   <span className="text-gray-400 text-xs">{PROPERTY_SETS[item.color].label}</span>
                 </button>
@@ -421,7 +449,7 @@ export const ActionPanel: React.FC = () => {
                 </>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       );
     }

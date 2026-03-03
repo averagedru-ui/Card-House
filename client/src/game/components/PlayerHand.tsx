@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, PropertyColor } from '../types';
 import { CardComponent } from './CardComponent';
 import { useCardGame } from '../useCardGame';
@@ -8,6 +9,7 @@ export const PlayerHand: React.FC = () => {
   const phase = useCardGame(s => s.phase);
   const players = useCardGame(s => s.players);
   const currentPlayerIndex = useCardGame(s => s.currentPlayerIndex);
+  const myPlayerIndex = useCardGame(s => s.myPlayerIndex);
   const playToBank = useCardGame(s => s.playToBank);
   const playProperty = useCardGame(s => s.playProperty);
   const playAction = useCardGame(s => s.playAction);
@@ -18,10 +20,10 @@ export const PlayerHand: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
-  const player = players[0];
+  const player = players[myPlayerIndex];
   if (!player) return null;
 
-  const isMyTurn = currentPlayerIndex === 0;
+  const isMyTurn = currentPlayerIndex === myPlayerIndex;
   const canPlay = isMyTurn && phase === 'play';
   const mustDiscard = isMyTurn && phase === 'discard';
   const canDraw = isMyTurn && phase === 'draw';
@@ -32,9 +34,7 @@ export const PlayerHand: React.FC = () => {
       setSelectedCard(null);
       return;
     }
-
     if (!canPlay) return;
-
     if (selectedCard?.id === card.id) {
       setSelectedCard(null);
       return;
@@ -79,71 +79,80 @@ export const PlayerHand: React.FC = () => {
     <div className="bg-gray-900/95 border-t border-gray-700 p-2 md:p-3">
       {canDraw && (
         <div className="flex justify-center mb-2">
-          <button
+          <motion.button
+            initial={{ scale: 0.9 }}
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
             onClick={draw}
-            className="px-6 py-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-lg hover:from-sky-400 hover:to-blue-500 active:scale-95 transition-all shadow-lg animate-pulse"
+            className="px-6 py-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold rounded-lg hover:from-sky-400 hover:to-blue-500 active:scale-95 transition-all shadow-lg shadow-blue-500/30"
           >
             Draw 2 Cards
-          </button>
+          </motion.button>
         </div>
       )}
 
-      {selectedCard && canPlay && (
-        <div className="flex gap-2 justify-center mb-2 flex-wrap">
-          {canPlayAsProperty && (
-            <button
-              onClick={handlePlayAsProperty}
-              className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-500 active:scale-95"
-            >
-              Play Property
-            </button>
-          )}
-          {canPlayAsAction && (
-            <button
-              onClick={handlePlayAction}
-              className="px-3 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-500 active:scale-95"
-            >
-              Play Action
-            </button>
-          )}
-          {canBankIt && (
-            <button
-              onClick={handlePlayToBank}
-              className="px-3 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 active:scale-95"
-            >
-              Bank It (${selectedCard.value}M)
-            </button>
-          )}
-          <button
-            onClick={() => setSelectedCard(null)}
-            className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 active:scale-95"
+      <AnimatePresence>
+        {selectedCard && canPlay && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="flex gap-2 justify-center mb-2 flex-wrap"
           >
-            Cancel
-          </button>
-        </div>
-      )}
+            {canPlayAsProperty && (
+              <button onClick={handlePlayAsProperty}
+                className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-500 active:scale-95 transition-all">
+                Play Property
+              </button>
+            )}
+            {canPlayAsAction && (
+              <button onClick={handlePlayAction}
+                className="px-3 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-500 active:scale-95 transition-all">
+                Play Action
+              </button>
+            )}
+            {canBankIt && (
+              <button onClick={handlePlayToBank}
+                className="px-3 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
+                Bank It (${selectedCard.value}M)
+              </button>
+            )}
+            <button onClick={() => setSelectedCard(null)}
+              className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 active:scale-95 transition-all">
+              Cancel
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {canPlay && !selectedCard && (
         <div className="flex justify-center mb-2">
-          <button
-            onClick={endCurrentTurn}
-            className="px-4 py-1.5 bg-gray-700 text-gray-300 text-sm rounded-lg hover:bg-gray-600 active:scale-95 border border-gray-600"
-          >
+          <button onClick={endCurrentTurn}
+            className="px-4 py-1.5 bg-gray-700 text-gray-300 text-sm rounded-lg hover:bg-gray-600 active:scale-95 border border-gray-600 transition-all">
             End Turn
           </button>
         </div>
       )}
 
       <div className="flex gap-1.5 md:gap-2 justify-center flex-wrap max-h-40 md:max-h-44 overflow-y-auto">
-        {player.hand.map(card => (
-          <CardComponent
-            key={card.id}
-            card={card}
-            onClick={() => handleCardClick(card)}
-            selected={selectedCard?.id === card.id}
-            disabled={!canPlay && !mustDiscard && !canDraw}
-          />
-        ))}
+        <AnimatePresence>
+          {player.hand.map((card, i) => (
+            <motion.div
+              key={card.id}
+              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.8 }}
+              transition={{ duration: 0.3, delay: i * 0.03 }}
+            >
+              <CardComponent
+                card={card}
+                onClick={() => handleCardClick(card)}
+                selected={selectedCard?.id === card.id}
+                disabled={!canPlay && !mustDiscard && !canDraw}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
         {player.hand.length === 0 && (
           <div className="text-gray-500 text-sm py-8">No cards in hand</div>
         )}
@@ -151,13 +160,16 @@ export const PlayerHand: React.FC = () => {
 
       {showColorPicker && selectedCard?.colors && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowColorPicker(false)}>
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-600" onClick={e => e.stopPropagation()}>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-800 rounded-xl p-4 border border-gray-600"
+            onClick={e => e.stopPropagation()}
+          >
             <h3 className="text-white font-bold mb-3 text-center">Choose a color</h3>
             <div className="flex gap-2 flex-wrap justify-center">
               {selectedCard.colors.map(color => (
-                <button
-                  key={color}
-                  onClick={() => handleColorChoice(color)}
+                <button key={color} onClick={() => handleColorChoice(color)}
                   className={`px-4 py-2 rounded-lg font-bold text-white bg-gradient-to-br ${
                     color === 'brown' ? 'from-amber-800 to-amber-900' :
                     color === 'blue' ? 'from-blue-500 to-blue-700' :
@@ -169,13 +181,13 @@ export const PlayerHand: React.FC = () => {
                     color === 'teal' ? 'from-teal-400 to-teal-600' :
                     color === 'purple' ? 'from-purple-500 to-purple-700' :
                     'from-gray-700 to-gray-900'
-                  } hover:scale-105 active:scale-95`}
+                  } hover:scale-105 active:scale-95 transition-all`}
                 >
                   {PROPERTY_SETS[color].label}
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>

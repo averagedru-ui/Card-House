@@ -5,6 +5,9 @@ import { OpponentArea } from './OpponentArea';
 import { PropertyArea } from './PropertyArea';
 import { ActionPanel } from './ActionPanel';
 import { GameOverScreen } from './GameOverScreen';
+import { GameLog } from './GameLog';
+import { TurnBanner } from './TurnBanner';
+import { ActionNotification } from './ActionNotification';
 import { PropertyColor } from '../types';
 import { getCompleteSets, getTotalBankValue } from '../engine';
 
@@ -20,14 +23,22 @@ export const GameBoard: React.FC = () => {
   const pendingAction = useCardGame(s => s.pendingAction);
   const processAITurns = useCardGame(s => s.processAITurns);
   const selectTarget = useCardGame(s => s.selectTarget);
+  const myPlayerIndex = useCardGame(s => s.myPlayerIndex);
+  const isMultiplayer = useCardGame(s => s.isMultiplayer);
 
   const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (phase === 'game_over') return;
+    if (phase === 'game_over' || isMultiplayer) return;
 
     const currentPlayer = players[currentPlayerIndex];
-    if (!currentPlayer?.isAI) return;
+    if (!currentPlayer?.isAI && phase !== 'action_response') return;
+
+    if (phase === 'action_response') {
+      const responderId = pendingAction?.targetPlayerId;
+      const responder = players.find(p => p.id === responderId);
+      if (!responder?.isAI) return;
+    }
 
     if (phase === 'pay_debt' && pendingAction?.currentResponder !== undefined) {
       const responder = players.find(p => p.id === pendingAction.currentResponder);
@@ -45,9 +56,10 @@ export const GameBoard: React.FC = () => {
     return () => {
       if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
     };
-  }, [phase, currentPlayerIndex, turnNumber, cardsPlayedThisTurn, pendingAction?.currentResponder]);
+  }, [phase, currentPlayerIndex, turnNumber, cardsPlayedThisTurn, pendingAction?.currentResponder, pendingAction?.targetPlayerId]);
 
   useEffect(() => {
+    if (isMultiplayer) return;
     if (phase !== 'pay_debt') return;
     if (pendingAction?.currentResponder === undefined) return;
     const responder = players.find(p => p.id === pendingAction.currentResponder);
@@ -64,13 +76,14 @@ export const GameBoard: React.FC = () => {
     return <GameOverScreen />;
   }
 
-  const humanPlayer = players[0];
-  const opponents = players.slice(1);
+  const humanPlayer = players[myPlayerIndex];
+  const opponents = players.filter((_, i) => i !== myPlayerIndex);
   const completeSets = humanPlayer ? getCompleteSets(humanPlayer) : [];
   const bankValue = humanPlayer ? getTotalBankValue(humanPlayer) : 0;
+  const isMyTurn = currentPlayerIndex === myPlayerIndex;
 
   const handleOpponentPropertyClick = (color: PropertyColor, cardId: string, playerId: number) => {
-    if (phase === 'action_target' && pendingAction && currentPlayerIndex === 0) {
+    if (phase === 'action_target' && pendingAction && isMyTurn) {
       if (pendingAction.type === 'sly_deal' || pendingAction.type === 'forced_deal') {
         selectTarget(playerId, color, cardId);
       }
@@ -79,10 +92,14 @@ export const GameBoard: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-b from-gray-900 via-gray-850 to-gray-900 overflow-hidden">
+      <TurnBanner />
+      <ActionNotification />
+
       <div className="bg-gray-900/90 border-b border-gray-700 px-3 py-1.5 flex items-center justify-between text-xs md:text-sm">
         <div className="flex items-center gap-3">
           <span className="text-yellow-500 font-black text-sm md:text-base tracking-tight">CARD TYCOON</span>
           <span className="text-gray-500">Turn {turnNumber}</span>
+          {isMultiplayer && <span className="text-indigo-400 text-[10px] font-semibold px-1.5 py-0.5 bg-indigo-900/50 rounded">ONLINE</span>}
         </div>
         <div className="flex items-center gap-3 text-gray-400">
           <span>Deck: {drawPile.length}</span>
@@ -90,11 +107,11 @@ export const GameBoard: React.FC = () => {
         </div>
       </div>
 
-      <div className={`text-center py-1.5 px-4 text-sm font-medium ${
-        currentPlayerIndex === 0 ? 'bg-indigo-900/50 text-indigo-300' : 'bg-gray-800/50 text-gray-400'
+      <div className={`text-center py-1.5 px-4 text-sm font-medium transition-colors ${
+        isMyTurn ? 'bg-indigo-900/50 text-indigo-300' : 'bg-gray-800/50 text-gray-400'
       }`}>
         {message}
-        {phase === 'play' && currentPlayerIndex === 0 && (
+        {phase === 'play' && isMyTurn && (
           <span className="ml-2 text-gray-500">({3 - cardsPlayedThisTurn} plays left)</span>
         )}
       </div>
@@ -111,21 +128,23 @@ export const GameBoard: React.FC = () => {
           ))}
         </div>
 
+        <GameLog />
+
         {humanPlayer && (
-          <div className={`rounded-xl border p-2 md:p-3 ${
-            currentPlayerIndex === 0
-              ? 'border-indigo-500 bg-indigo-500/5'
+          <div className={`rounded-xl border p-2 md:p-3 transition-all ${
+            isMyTurn
+              ? 'border-indigo-500 bg-indigo-500/5 shadow-sm shadow-indigo-500/10'
               : 'border-gray-700 bg-gray-800/30'
           }`}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
-                  currentPlayerIndex === 0 ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-300'
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  isMyTurn ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-300'
                 }`}>
-                  Y
+                  {humanPlayer.name[0]}
                 </div>
-                <span className="text-white text-sm font-semibold">You</span>
-                {currentPlayerIndex === 0 && <span className="text-indigo-400 text-[10px] animate-pulse">YOUR TURN</span>}
+                <span className="text-white text-sm font-semibold">{humanPlayer.name}</span>
+                {isMyTurn && <span className="text-indigo-400 text-[10px] animate-pulse">YOUR TURN</span>}
               </div>
               <div className="flex gap-3 text-xs">
                 <span className="text-emerald-400 font-bold">Bank: ${bankValue}M</span>
@@ -150,7 +169,6 @@ export const GameBoard: React.FC = () => {
       </div>
 
       <PlayerHand />
-
       <ActionPanel />
     </div>
   );
