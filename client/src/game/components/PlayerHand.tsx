@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, PropertyColor } from '../types';
 import { CardComponent } from './CardComponent';
@@ -10,6 +10,7 @@ export const PlayerHand: React.FC = () => {
   const players = useCardGame(s => s.players);
   const currentPlayerIndex = useCardGame(s => s.currentPlayerIndex);
   const myPlayerIndex = useCardGame(s => s.myPlayerIndex);
+  const cardsPlayedThisTurn = useCardGame(s => s.cardsPlayedThisTurn);
   const playToBank = useCardGame(s => s.playToBank);
   const playProperty = useCardGame(s => s.playProperty);
   const playAction = useCardGame(s => s.playAction);
@@ -21,6 +22,24 @@ export const PlayerHand: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const player = players[myPlayerIndex];
+
+  useEffect(() => {
+    if (selectedCard && player) {
+      const stillInHand = player.hand.some(c => c.id === selectedCard.id);
+      if (!stillInHand) {
+        setSelectedCard(null);
+        setShowColorPicker(false);
+      }
+    }
+  }, [player?.hand, selectedCard]);
+
+  useEffect(() => {
+    if (phase !== 'play') {
+      setSelectedCard(null);
+      setShowColorPicker(false);
+    }
+  }, [phase]);
+
   if (!player) return null;
 
   const isMyTurn = currentPlayerIndex === myPlayerIndex;
@@ -91,44 +110,58 @@ export const PlayerHand: React.FC = () => {
         </div>
       )}
 
-      <AnimatePresence>
-        {selectedCard && canPlay && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="flex gap-2 justify-center mb-2 flex-wrap"
-          >
-            {canPlayAsProperty && (
-              <button onClick={handlePlayAsProperty}
-                className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-500 active:scale-95 transition-all">
-                Play Property
-              </button>
+      {canPlay && (
+        <div className="flex gap-2 justify-center mb-2 flex-wrap">
+          <AnimatePresence>
+            {selectedCard && (
+              <>
+                {canPlayAsProperty && (
+                  <motion.button
+                    key="prop"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handlePlayAsProperty}
+                    className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-500 active:scale-95 transition-all">
+                    Play Property
+                  </motion.button>
+                )}
+                {canPlayAsAction && (
+                  <motion.button
+                    key="action"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handlePlayAction}
+                    className="px-3 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-500 active:scale-95 transition-all">
+                    Play Action
+                  </motion.button>
+                )}
+                {canBankIt && (
+                  <motion.button
+                    key="bank"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handlePlayToBank}
+                    className="px-3 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
+                    Bank It (${selectedCard.value}M)
+                  </motion.button>
+                )}
+                <motion.button
+                  key="cancel"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={() => setSelectedCard(null)}
+                  className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 active:scale-95 transition-all">
+                  Cancel
+                </motion.button>
+              </>
             )}
-            {canPlayAsAction && (
-              <button onClick={handlePlayAction}
-                className="px-3 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-500 active:scale-95 transition-all">
-                Play Action
-              </button>
-            )}
-            {canBankIt && (
-              <button onClick={handlePlayToBank}
-                className="px-3 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
-                Bank It (${selectedCard.value}M)
-              </button>
-            )}
-            <button onClick={() => setSelectedCard(null)}
-              className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 active:scale-95 transition-all">
-              Cancel
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {canPlay && !selectedCard && (
-        <div className="flex justify-center mb-2">
-          <button onClick={endCurrentTurn}
-            className="px-4 py-1.5 bg-gray-700 text-gray-300 text-sm rounded-lg hover:bg-gray-600 active:scale-95 border border-gray-600 transition-all">
+          </AnimatePresence>
+          <button onClick={() => { setSelectedCard(null); endCurrentTurn(); }}
+            className="px-5 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white text-sm font-bold rounded-lg hover:from-orange-400 hover:to-red-500 active:scale-95 transition-all shadow-md shadow-orange-500/20 border border-orange-400/30">
             End Turn
           </button>
         </div>
