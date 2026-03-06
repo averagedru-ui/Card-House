@@ -75,7 +75,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
                 </button>
               </div>
             )}
-            <p className="text-gray-500 text-xs mt-0.5">Property Rush Player</p>
+            <p className="text-gray-500 text-xs mt-0.5">It's A Deal Player</p>
           </div>
         </motion.div>
 

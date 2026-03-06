@@ -20,7 +20,7 @@ import {
 } from './engine';
 import { useProfile } from './useProfile';
 
-const SAVE_KEY = 'property_rush_save';
+const SAVE_KEY = 'its_a_deal_save';
 
 function saveToLocalStorage(state: GameState) {
   try {

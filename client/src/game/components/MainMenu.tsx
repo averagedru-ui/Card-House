@@ -42,7 +42,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer, onRules, onPr
       <div className="flex-shrink-0 my-auto w-full max-w-md flex flex-col items-center">
         <div className="text-center mb-5">
           <h1 className="text-4xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 mb-1 tracking-tight">
-            PROPERTY RUSH
+            IT'S A DEAL
           </h1>
           <p className="text-sm md:text-lg text-indigo-300 font-medium">
             The Property Card Game

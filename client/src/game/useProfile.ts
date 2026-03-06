@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const PROFILE_KEY = 'property_rush_profile';
+const PROFILE_KEY = 'its_a_deal_profile';
 
 export interface Quest {
   id: string;

@@ -99,7 +99,7 @@ export const GameBoard: React.FC = () => {
       <div className="bg-gray-900 border-b border-gray-800 px-3 py-2 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-2">
           <GameMenu />
-          <span className="text-yellow-500 font-black text-sm tracking-tight">PROPERTY RUSH</span>
+          <span className="text-yellow-500 font-black text-sm tracking-tight">IT'S A DEAL</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-gray-500 text-[11px]">T{turnNumber}</span>

@@ -1,4 +1,4 @@
-# Property Rush - Property Card Game
+# It's A Deal - Property Card Game
 
 ## Overview
 A Monopoly Deal-inspired property card game built with React, TypeScript, and Tailwind CSS. Players compete against AI opponents or other players online to collect 3 complete property sets.
