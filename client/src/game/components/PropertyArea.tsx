@@ -41,11 +41,7 @@ export const PropertyArea: React.FC<PropertyAreaProps> = ({ player, compact, onP
   const colors = (Object.keys(PROPERTY_SETS) as PropertyColor[]).filter(c => player.properties[c].length > 0);
 
   if (colors.length === 0) {
-    return (
-      <div className={`text-gray-500 text-[11px] ${compact ? 'py-0.5' : 'py-1.5'} text-center italic`}>
-        No properties
-      </div>
-    );
+    return null;
   }
 
   const cardW = compact ? 'w-10' : 'w-14';

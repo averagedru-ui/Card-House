@@ -122,7 +122,7 @@ export const GameBoard: React.FC = () => {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5"
+      <div className="flex-1 overflow-y-auto overscroll-contain p-2 flex flex-col"
            style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className={`grid gap-1.5 ${opponents.length === 1 ? 'grid-cols-1' : 'grid-cols-1'}`}>
           {opponents.map(opp => (
@@ -135,7 +135,9 @@ export const GameBoard: React.FC = () => {
           ))}
         </div>
 
-        <TableCenter />
+        <div className="flex-1 flex items-center justify-center">
+          <TableCenter />
+        </div>
       </div>
 
       {humanPlayer && (
