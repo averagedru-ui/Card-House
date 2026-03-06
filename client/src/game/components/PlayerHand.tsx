@@ -179,7 +179,7 @@ export const PlayerHand: React.FC = () => {
 
       <div className="flex justify-center overflow-x-auto pb-1 -mx-2 px-2"
            style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="relative mx-auto" style={{ width: `${totalWidth}px`, height: '135px' }}>
+        <div className="relative mx-auto" style={{ width: `${totalWidth}px`, height: '145px', paddingTop: '10px' }}>
           <AnimatePresence>
             {player.hand.map((card, i) => {
               const isSelected = selectedCard?.id === card.id;
@@ -190,13 +190,13 @@ export const PlayerHand: React.FC = () => {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{
                     opacity: 1,
-                    y: isSelected ? -24 : isExpanded ? -12 : 0,
-                    scale: isSelected ? 1.1 : 1,
+                    y: isSelected ? -8 : isExpanded ? -4 : 10,
+                    scale: isSelected ? 1.08 : 1,
                     x: 0,
                   }}
                   exit={{ opacity: 0, y: 30 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                  className="absolute top-2"
+                  className="absolute top-0"
                   style={{
                     left: `${i * overlapPx}px`,
                     zIndex: isSelected ? 100 : isExpanded ? 50 : i,

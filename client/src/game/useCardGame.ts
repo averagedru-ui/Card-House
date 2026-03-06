@@ -17,6 +17,7 @@ import {
   resolveActionResponse,
   getAIAction,
   getRentAmount,
+  getCompleteSets,
 } from './engine';
 import { useProfile } from './useProfile';
 import {
@@ -342,6 +343,52 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         autoSave(newState, false);
         return;
       }
+      return;
+    }
+
+    if (state.phase === 'pay_debt') {
+      const payerId = state.pendingAction?.currentResponder;
+      if (payerId === undefined) return;
+      const payer = state.players.find(p => p.id === payerId);
+      if (!payer?.isAI) return;
+
+      const amount = state.pendingAction?.amount || 0;
+      const bankSorted = [...payer.bank].sort((a, b) => a.value - b.value);
+      const toPayIds: string[] = [];
+      let paid = 0;
+
+      for (const card of bankSorted) {
+        if (paid >= amount) break;
+        toPayIds.push(card.id);
+        paid += card.value;
+      }
+
+      if (paid < amount) {
+        for (const color of Object.keys(payer.properties) as PropertyColor[]) {
+          const completeSetsCheck = getCompleteSets(payer);
+          if (completeSetsCheck.includes(color)) continue;
+          for (const card of payer.properties[color]) {
+            if (paid >= amount) break;
+            toPayIds.push(card.id);
+            paid += card.value;
+          }
+        }
+      }
+
+      if (toPayIds.length === 0 && payer.bank.length > 0) {
+        toPayIds.push(payer.bank[0].id);
+      }
+
+      if (toPayIds.length === 0) {
+        const newState = resolveDebtPayment(state, payerId, []);
+        set(newState);
+        autoSave(newState, false);
+        return;
+      }
+
+      const newState = resolveDebtPayment(state, payerId, toPayIds);
+      set(newState);
+      autoSave(newState, false);
       return;
     }
 

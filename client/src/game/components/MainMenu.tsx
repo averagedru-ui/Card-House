@@ -56,7 +56,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer, onRules, onPr
             </div>
             <div className="flex-1">
               <p className="text-white font-semibold text-sm">{playerName}</p>
-              <p className="text-gray-500 text-[10px]">Tap to view profile</p>
+              <p className="text-gray-500 text-[10px]">
+                {playerName === 'Player' ? 'Tap to set your name' : 'Tap to view profile'}
+              </p>
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
               <path d="M9 18l6-6-6-6" />
@@ -135,8 +137,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer, onRules, onPr
               onClick={onProfile}
               className="py-2.5 bg-gray-700/60 active:bg-gray-600 text-gray-300 font-semibold text-xs rounded-xl transition-colors flex flex-col items-center gap-1"
             >
-              <span className="text-base">👤</span>
-              Profile
+              <span className="text-base">📊</span>
+              Stats
             </button>
           </div>
         </div>
