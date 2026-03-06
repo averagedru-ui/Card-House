@@ -68,13 +68,16 @@ script/
 - Save & Quit option in in-game menu preserves state
 
 ## Multiplayer
-- WebSocket-based real-time multiplayer via `/ws` endpoint
-- Room system with 5-character codes
+- Firebase Realtime Database-based multiplayer (no backend server needed)
+- Room system with 5-character codes stored in Firebase
 - Optional room password (set on create, required to join if set)
 - Shareable invite links (`?room=XXXXX` URL parameter)
-- Server-authoritative game state with per-player views (opponents' hands hidden)
+- Client-side game logic with Firebase state sync (trust-based, suitable for friends)
+- Player views: opponents' hands hidden via client-side filtering
 - 2-4 players per room
-- In-game chat via WebSocket (`send_chat` / `chat_message` message types)
+- In-game chat via Firebase Realtime Database
+- Firebase config in `client/src/game/firebase.ts`
+- Multiplayer service in `client/src/game/firebaseMultiplayer.ts`
 
 ## Profile System
 - localStorage-backed player profile (name, stats, friends, quest progress)
@@ -94,7 +97,14 @@ script/
 - Fully responsive (desktop + mobile)
 
 ## Deployment
-- Build: `npm run build`
+### Replit (dev server)
+- Dev: `npm run dev` (Express + Vite dev server on port 5000)
+- Build: `npm run build` (bundles server + client)
 - Run: `node ./dist/index.cjs`
-- Port: 5000 (configured via PORT env var)
-- Autoscale deployment type
+
+### Vercel / Static Deploy
+- Push to GitHub, connect to Vercel
+- `vercel.json` configured: builds client via Vite, outputs to `dist/`, SPA rewrites
+- No backend server needed — multiplayer runs via Firebase
+- Firebase project: itsadeal-b2716
+- Firebase Realtime Database: https://itsadeal-b2716-default-rtdb.firebaseio.com

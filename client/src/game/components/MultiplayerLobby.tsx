@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useCardGame } from '../useCardGame';
+import {
+  createRoom as fbCreateRoom,
+  joinRoom as fbJoinRoom,
+  leaveRoom as fbLeaveRoom,
+  startGame as fbStartGame,
+  getCurrentRoomId,
+} from '../firebaseMultiplayer';
+import { initializeGame } from '../engine';
+import type { FirebaseCallbacks } from '../firebaseMultiplayer';
 
 interface MultiplayerLobbyProps {
   onBack: () => void;
@@ -17,73 +26,32 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   const [roomPlayers, setRoomPlayers] = useState<string[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [copied, setCopied] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-  const setMultiplayerWs = useCardGame(s => s.setMultiplayerWs);
+  const setFirebaseMultiplayer = useCardGame(s => s.setFirebaseMultiplayer);
   const setMultiplayerState = useCardGame(s => s.setMultiplayerState);
   const addChatMessage = useCardGame(s => s.addChatMessage);
 
-  const connectWs = useCallback((action: string, room?: string, name?: string, pw?: string) => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      const payload: any = { type: action, roomId: room, playerName: name || playerName };
-      if (pw) payload.password = pw;
-      ws.send(JSON.stringify(payload));
-    };
-
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      switch (msg.type) {
-        case 'room_created':
-          setRoomId(msg.roomId);
-          setIsHost(true);
-          setRoomHasPassword(!!msg.hasPassword);
-          setStatus('waiting');
-          setRoomPlayers(msg.players || [name || playerName]);
-          break;
-        case 'room_joined':
-          setRoomId(msg.roomId);
-          setIsHost(false);
-          setStatus('waiting');
-          setRoomPlayers(msg.players || []);
-          break;
-        case 'player_joined':
-          setRoomPlayers(msg.players || []);
-          break;
-        case 'player_left':
-          setRoomPlayers(msg.players || []);
-          break;
-        case 'game_started':
-          setMultiplayerWs(ws);
-          setMultiplayerState(msg.gameState, msg.playerIndex);
-          break;
-        case 'game_update':
-          setMultiplayerState(msg.gameState, msg.playerIndex);
-          break;
-        case 'chat_message':
-          addChatMessage({ sender: msg.sender, text: msg.text, timestamp: msg.timestamp });
-          break;
-        case 'error':
-          setError(msg.message);
-          setStatus('error');
-          break;
-      }
-    };
-
-    ws.onclose = () => {
-      if (status === 'waiting') {
-        setError('Connection lost');
-        setStatus('error');
-      }
-    };
-
-    ws.onerror = () => {
-      setError('Connection failed');
+  const callbacks: FirebaseCallbacks = {
+    onPlayersChanged: (players) => {
+      setRoomPlayers(players);
+    },
+    onGameStarted: (gameState, playerIndex) => {
+      setFirebaseMultiplayer(true);
+      setMultiplayerState(gameState, playerIndex);
+    },
+    onGameUpdate: (gameState, playerIndex) => {
+      setMultiplayerState(gameState, playerIndex);
+    },
+    onChatMessage: (msg) => {
+      addChatMessage({ sender: msg.sender, text: msg.text, timestamp: msg.timestamp });
+    },
+    onError: (message) => {
+      setError(message);
       setStatus('error');
-    };
-  }, [playerName, status]);
+    },
+    onPlayerLeft: (players, leftPlayer) => {
+      setRoomPlayers(players);
+    },
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -92,23 +60,35 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
       setJoinCode(room);
     }
     return () => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.close();
+      if (status === 'waiting' && getCurrentRoomId()) {
       }
     };
   }, []);
 
-  const createRoom = () => {
+  const handleCreateRoom = async () => {
     if (!playerName.trim()) {
       setError('Enter your name');
       return;
     }
     setStatus('creating');
     setError('');
-    connectWs('create_room', undefined, playerName.trim(), password.trim() || undefined);
+    try {
+      const code = await fbCreateRoom(
+        playerName.trim(),
+        password.trim() || null,
+        callbacks
+      );
+      setRoomId(code);
+      setIsHost(true);
+      setRoomHasPassword(!!password.trim());
+      setStatus('waiting');
+    } catch (err) {
+      setError('Failed to create room');
+      setStatus('error');
+    }
   };
 
-  const joinRoom = () => {
+  const handleJoinRoom = async () => {
     if (!playerName.trim()) {
       setError('Enter your name');
       return;
@@ -119,13 +99,35 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
     }
     setStatus('joining');
     setError('');
-    connectWs('join_room', joinCode.trim().toUpperCase(), playerName.trim(), joinPassword.trim() || undefined);
+    try {
+      const success = await fbJoinRoom(
+        joinCode.trim().toUpperCase(),
+        playerName.trim(),
+        joinPassword.trim() || null,
+        callbacks
+      );
+      if (success) {
+        setRoomId(joinCode.trim().toUpperCase());
+        setIsHost(false);
+        setStatus('waiting');
+      } else {
+        setStatus('idle');
+      }
+    } catch (err) {
+      setError('Failed to join room');
+      setStatus('error');
+    }
   };
 
-  const startGame = () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'start_game' }));
-    }
+  const handleStartGame = async () => {
+    if (roomPlayers.length < 2) return;
+    const gameState = initializeGame(roomPlayers.length, roomPlayers);
+    await fbStartGame(gameState);
+  };
+
+  const handleLeave = async () => {
+    await fbLeaveRoom();
+    onBack();
   };
 
   const copyLink = () => {
@@ -176,7 +178,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
 
           {isHost ? (
             <button
-              onClick={startGame}
+              onClick={handleStartGame}
               disabled={roomPlayers.length < 2}
               className={`w-full py-4 rounded-xl font-black text-lg transition-all ${
                 roomPlayers.length >= 2
@@ -191,7 +193,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
             </div>
           )}
 
-          <button onClick={() => { wsRef.current?.close(); onBack(); }}
+          <button onClick={handleLeave}
             className="w-full mt-3 py-2 text-gray-500 text-sm hover:text-gray-300 transition-colors">
             Leave Room
           </button>
@@ -236,7 +238,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
           />
         </div>
 
-        <button onClick={createRoom}
+        <button onClick={handleCreateRoom}
           disabled={status === 'creating'}
           className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white font-bold text-lg rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-indigo-500/20 mb-4">
           {status === 'creating' ? 'Creating...' : 'Create Room'}
@@ -257,7 +259,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
               placeholder="ROOM CODE"
               className="flex-1 px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white text-center font-bold tracking-widest placeholder-gray-500 focus:border-indigo-500 focus:outline-none uppercase transition-colors"
             />
-            <button onClick={joinRoom}
+            <button onClick={handleJoinRoom}
               disabled={status === 'joining'}
               className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all">
               Join

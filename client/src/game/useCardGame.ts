@@ -19,6 +19,12 @@ import {
   getRentAmount,
 } from './engine';
 import { useProfile } from './useProfile';
+import {
+  sendGameAction,
+  sendChatMessage as fbSendChat,
+  leaveRoom as fbLeaveRoom,
+  isConnected as fbIsConnected,
+} from './firebaseMultiplayer';
 
 const SAVE_KEY = 'its_a_deal_save';
 
@@ -82,6 +88,7 @@ interface CardGameStore extends GameState {
   processAITurns: () => void;
   setMultiplayerState: (state: Partial<GameState>, playerIndex: number) => void;
   setMultiplayerWs: (ws: WebSocket | null) => void;
+  setFirebaseMultiplayer: (active: boolean) => void;
   sendMultiplayerAction: (action: any) => void;
   saveGame: () => void;
   loadGame: () => boolean;
@@ -102,6 +109,11 @@ function autoSave(state: GameState, isMultiplayer: boolean) {
   saveTimeout = setTimeout(() => {
     saveToLocalStorage(state);
   }, 500);
+}
+
+function processAndSyncMultiplayer(newState: GameState, get: () => CardGameStore, set: (s: Partial<CardGameStore>) => void) {
+  set(newState as any);
+  sendGameAction(newState);
 }
 
 export const useCardGame = create<CardGameStore>((set, get) => ({
@@ -131,14 +143,16 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
       state.players[0].name = playerName;
     }
     state.message = `${state.players[0].name}'s turn - Draw 2 cards`;
-    set({ ...state, myPlayerIndex: 0, isMultiplayer: false, chatMessages: [], chatNextId: 1 });
+    set({ ...state, myPlayerIndex: 0, isMultiplayer: false, multiplayerWs: null, chatMessages: [], chatNextId: 1 });
     autoSave(state, false);
   },
 
   draw: () => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'draw' });
+      if (state.phase !== 'draw' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const newState = drawCards(state, 2);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'draw') return;
@@ -150,7 +164,9 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   playToBank: (cardId: string) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'play_bank', cardId });
+      if (state.phase !== 'play' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const newState = playCardToBank(state, cardId);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'play') return;
@@ -162,7 +178,9 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   playProperty: (cardId: string, color?: PropertyColor) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'play_property', cardId, color });
+      if (state.phase !== 'play' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const newState = playPropertyCard(state, cardId, color);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'play') return;
@@ -174,7 +192,13 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   playAction: (cardId: string) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'play_action', cardId });
+      if (state.phase !== 'play' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const result = playActionCard(state, cardId);
+      if ('needsTarget' in result) {
+        processAndSyncMultiplayer(result.state, get, set);
+      } else {
+        processAndSyncMultiplayer(result as GameState, get, set);
+      }
       return;
     }
     if (state.phase !== 'play') return;
@@ -198,7 +222,9 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   discard: (cardId: string) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'discard', cardId });
+      if (state.phase !== 'discard' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const newState = discardCard(state, cardId);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'discard') return;
@@ -210,7 +236,9 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   endCurrentTurn: () => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'end_turn' });
+      if (state.phase !== 'play' || state.currentPlayerIndex !== state.myPlayerIndex) return;
+      const newState = endTurn(state);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'play') return;
@@ -226,7 +254,8 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   selectTarget: (targetPlayerId: number, targetColor?: PropertyColor, targetCardId?: string) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'select_target', targetPlayerId, targetColor, targetCardId });
+      const newState = resolveTargetAction(state, targetPlayerId, targetColor, targetCardId);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'action_target' && state.phase !== 'forced_deal_pick') return;
@@ -238,7 +267,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   payDebt: (cardIds: string[]) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'pay_debt', cardIds });
+      const payerId = state.pendingAction?.currentResponder;
+      if (payerId === undefined) return;
+      const newState = resolveDebtPayment(state, payerId, cardIds);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'pay_debt') return;
@@ -252,7 +284,20 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   setForcedDealOffer: (color: PropertyColor, cardId: string) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'forced_deal_offer', color, cardId });
+      if (!state.pendingAction) return;
+      const player = state.players[state.currentPlayerIndex];
+      const card = player.properties[color].find(c => c.id === cardId);
+      if (!card) return;
+      const updated: Partial<GameState> = {
+        pendingAction: {
+          ...state.pendingAction,
+          offeredProperty: { color, card },
+        },
+        phase: 'action_target' as const,
+        message: 'Now choose an opponent\'s property to take',
+      };
+      set(updated as any);
+      sendGameAction({ ...state, ...updated } as GameState);
       return;
     }
     if (!state.pendingAction) return;
@@ -273,7 +318,8 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   respondAction: (useJustSayNo: boolean) => {
     const state = get();
     if (state.isMultiplayer) {
-      state.sendMultiplayerAction({ type: 'respond_action', useJustSayNo });
+      const newState = resolveActionResponse(state, useJustSayNo);
+      processAndSyncMultiplayer(newState, get, set);
       return;
     }
     if (state.phase !== 'action_response') return;
@@ -389,6 +435,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     set({ multiplayerWs: ws, isMultiplayer: ws !== null, chatMessages: [], chatNextId: 1 });
   },
 
+  setFirebaseMultiplayer: (active: boolean) => {
+    set({ isMultiplayer: active, multiplayerWs: null, chatMessages: [], chatNextId: 1 });
+  },
+
   sendMultiplayerAction: (action: any) => {
     const ws = get().multiplayerWs;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -439,6 +489,9 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     if (state.multiplayerWs) {
       state.multiplayerWs.close();
     }
+    if (state.isMultiplayer && fbIsConnected()) {
+      fbLeaveRoom();
+    }
     set({
       phase: 'menu',
       players: [],
@@ -462,9 +515,10 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
 
   sendChat: (text: string) => {
     const state = get();
-    const ws = state.multiplayerWs;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'send_chat', text }));
+    if (state.isMultiplayer && fbIsConnected()) {
+      const playerName = state.players[state.myPlayerIndex]?.name || 'You';
+      fbSendChat(playerName, text);
+      state.addChatMessage({ sender: playerName, text, timestamp: Date.now() });
     } else {
       const playerName = state.players[state.myPlayerIndex]?.name || 'You';
       state.addChatMessage({ sender: playerName, text, timestamp: Date.now() });
