@@ -92,34 +92,39 @@ export const GameBoard: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-gray-900 via-gray-850 to-gray-900 overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-gray-900 overflow-hidden">
       <TurnBanner />
       <ActionNotification />
 
-      <div className="bg-gray-900/90 border-b border-gray-700 px-3 py-1.5 flex items-center justify-between text-xs md:text-sm">
-        <div className="flex items-center gap-3">
+      <div className="bg-gray-900 border-b border-gray-800 px-3 py-2 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
+        <div className="flex items-center gap-2.5">
           <GameMenu />
-          <span className="text-yellow-500 font-black text-sm md:text-base tracking-tight">PROPERTY RUSH</span>
-          <span className="text-gray-500">Turn {turnNumber}</span>
-          {isMultiplayer && <span className="text-indigo-400 text-[10px] font-semibold px-1.5 py-0.5 bg-indigo-900/50 rounded">ONLINE</span>}
+          <span className="text-yellow-500 font-black text-sm tracking-tight">PROPERTY RUSH</span>
         </div>
-        <div className="flex gap-3 text-xs">
-          <span className="text-emerald-400 font-bold">Bank: ${bankValue}M</span>
-          <span className="text-yellow-400 font-bold">Sets: {completeSets.length}/3</span>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 text-[11px]">T{turnNumber}</span>
+          <div className="flex items-center gap-1 bg-emerald-900/30 rounded-lg px-2 py-0.5">
+            <span className="text-emerald-400 text-[11px] font-bold">${bankValue}M</span>
+          </div>
+          <div className="flex items-center gap-1 bg-yellow-900/30 rounded-lg px-2 py-0.5">
+            <span className="text-yellow-400 text-[11px] font-bold">{completeSets.length}/3</span>
+          </div>
+          {isMultiplayer && <span className="text-indigo-400 text-[9px] font-semibold px-1.5 py-0.5 bg-indigo-900/40 rounded-md">LIVE</span>}
         </div>
       </div>
 
-      <div className={`text-center py-1 px-4 text-sm font-medium transition-colors ${
-        isMyTurn ? 'bg-indigo-900/50 text-indigo-300' : 'bg-gray-800/50 text-gray-400'
+      <div className={`text-center py-1 px-3 text-xs font-medium ${
+        isMyTurn ? 'bg-indigo-900/30 text-indigo-300' : 'bg-gray-800/30 text-gray-400'
       }`}>
         {message}
         {phase === 'play' && isMyTurn && (
-          <span className="ml-2 text-gray-500">({3 - cardsPlayedThisTurn} plays left)</span>
+          <span className="ml-1.5 text-gray-500">({3 - cardsPlayedThisTurn} left)</span>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 md:p-3 space-y-2">
-        <div className={`grid gap-2 ${opponents.length === 1 ? 'grid-cols-1' : opponents.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3'}`}>
+      <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5"
+           style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className={`grid gap-1.5 ${opponents.length === 1 ? 'grid-cols-1' : 'grid-cols-1'}`}>
           {opponents.map(opp => (
             <OpponentArea
               key={opp.id}
@@ -133,39 +138,37 @@ export const GameBoard: React.FC = () => {
         <TableCenter />
 
         {humanPlayer && (
-          <div className={`rounded-xl border p-2 md:p-3 transition-all ${
+          <div className={`rounded-2xl border p-2.5 transition-all ${
             isMyTurn
-              ? 'border-indigo-500 bg-indigo-500/5 shadow-sm shadow-indigo-500/10'
-              : 'border-gray-700 bg-gray-800/30'
+              ? 'border-indigo-500/50 bg-indigo-500/5'
+              : 'border-gray-700/40 bg-gray-800/20'
           }`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                  isMyTurn ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-300'
-                }`}>
-                  {humanPlayer.name[0]}
-                </div>
-                <span className="text-white text-sm font-semibold">{humanPlayer.name}</span>
-                {isMyTurn && <span className="text-indigo-400 text-[10px] animate-pulse">YOUR TURN</span>}
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                isMyTurn ? 'bg-indigo-500 text-white' : 'bg-gray-700 text-gray-300'
+              }`}>
+                {humanPlayer.name[0]}
               </div>
+              <span className="text-white text-sm font-semibold">{humanPlayer.name}</span>
+              {isMyTurn && <span className="text-indigo-400 text-[10px] font-medium animate-pulse">Your Turn</span>}
             </div>
 
             <PropertyArea player={humanPlayer} highlightComplete />
 
             {humanPlayer.bank.length > 0 && (
-              <div className="mt-2 pt-1.5 border-t border-gray-700/50">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-gray-500 text-[10px]">Bank:</span>
+              <div className="mt-2 pt-1.5 border-t border-gray-700/30">
+                <div className="flex items-center gap-1 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  <span className="text-gray-500 text-[9px] flex-shrink-0">Bank:</span>
                   {humanPlayer.bank.map((card, i) => (
                     <div
                       key={card.id}
-                      className="w-9 h-12 md:w-10 md:h-14 rounded border border-emerald-600/60 bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center shadow-sm text-emerald-300 text-[9px] md:text-[10px] font-bold"
-                      style={{ marginLeft: i > 0 ? '-6px' : 0, zIndex: i }}
+                      className="w-8 h-10 rounded-lg border border-emerald-600/40 bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center shadow-sm text-emerald-300 text-[8px] font-bold flex-shrink-0"
+                      style={{ marginLeft: i > 0 ? '-4px' : 0, zIndex: i }}
                     >
                       ${card.value}M
                     </div>
                   ))}
-                  <span className="text-emerald-400 text-xs font-bold ml-1">${bankValue}M</span>
+                  <span className="text-emerald-400 text-[10px] font-bold ml-1 flex-shrink-0">${bankValue}M</span>
                 </div>
               </div>
             )}

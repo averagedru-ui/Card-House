@@ -19,6 +19,7 @@ export const PlayerHand: React.FC = () => {
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const player = players[myPlayerIndex];
 
@@ -28,6 +29,7 @@ export const PlayerHand: React.FC = () => {
       if (!stillInHand) {
         setSelectedCard(null);
         setShowColorPicker(false);
+        setExpandedIndex(null);
       }
     }
   }, [player?.hand, selectedCard]);
@@ -36,6 +38,7 @@ export const PlayerHand: React.FC = () => {
     if (phase !== 'play') {
       setSelectedCard(null);
       setShowColorPicker(false);
+      setExpandedIndex(null);
     }
   }, [phase]);
 
@@ -45,24 +48,28 @@ export const PlayerHand: React.FC = () => {
   const canPlay = isMyTurn && phase === 'play';
   const mustDiscard = isMyTurn && phase === 'discard';
 
-  const handleCardClick = (card: Card) => {
+  const handleCardClick = (card: Card, index: number) => {
     if (mustDiscard) {
       discard(card.id);
       setSelectedCard(null);
+      setExpandedIndex(null);
       return;
     }
     if (!canPlay) return;
     if (selectedCard?.id === card.id) {
       setSelectedCard(null);
+      setExpandedIndex(null);
       return;
     }
     setSelectedCard(card);
+    setExpandedIndex(index);
   };
 
   const handlePlayToBank = () => {
     if (!selectedCard) return;
     playToBank(selectedCard.id);
     setSelectedCard(null);
+    setExpandedIndex(null);
   };
 
   const handlePlayAsProperty = () => {
@@ -73,12 +80,14 @@ export const PlayerHand: React.FC = () => {
     }
     playProperty(selectedCard.id, selectedCard.color);
     setSelectedCard(null);
+    setExpandedIndex(null);
   };
 
   const handlePlayAction = () => {
     if (!selectedCard) return;
     playAction(selectedCard.id);
     setSelectedCard(null);
+    setExpandedIndex(null);
   };
 
   const handleColorChoice = (color: PropertyColor) => {
@@ -86,6 +95,7 @@ export const PlayerHand: React.FC = () => {
     playProperty(selectedCard.id, color);
     setSelectedCard(null);
     setShowColorPicker(false);
+    setExpandedIndex(null);
   };
 
   const canPlayAsProperty = selectedCard && (selectedCard.type === 'property' || selectedCard.type === 'wildcard');
@@ -93,99 +103,117 @@ export const PlayerHand: React.FC = () => {
   const canBankIt = selectedCard !== null;
 
   const cardCount = player.hand.length;
-  const overlapPx = cardCount <= 5 ? 70 : cardCount <= 8 ? 55 : cardCount <= 10 ? 45 : 36;
-  const totalWidth = cardCount > 0 ? (cardCount - 1) * overlapPx + 80 : 0;
+  const cardWidth = 72;
+  const minOverlap = 24;
+  const maxOverlap = cardWidth;
+  const containerWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth - 32, 600) : 360;
+  const overlapPx = cardCount > 1
+    ? Math.max(minOverlap, Math.min(maxOverlap, (containerWidth - cardWidth) / (cardCount - 1)))
+    : maxOverlap;
+  const totalWidth = cardCount > 0 ? (cardCount - 1) * overlapPx + cardWidth : 0;
 
   return (
-    <div className="bg-gray-900/95 border-t border-gray-700 p-2 md:p-3">
+    <div className="bg-gray-900/95 border-t border-gray-700/50 pb-[env(safe-area-inset-bottom)] pt-1.5 px-2">
       {canPlay && (
-        <div className="flex gap-2 justify-center mb-2 flex-wrap">
+        <div className="flex gap-1.5 justify-center mb-1.5 flex-wrap">
           <AnimatePresence>
             {selectedCard && (
               <>
                 {canPlayAsProperty && (
                   <motion.button
                     key="prop"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
                     onClick={handlePlayAsProperty}
-                    className="px-3 py-1.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-500 active:scale-95 transition-all">
-                    Play Property
+                    className="px-3.5 py-2 bg-green-600 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform">
+                    Property
                   </motion.button>
                 )}
                 {canPlayAsAction && (
                   <motion.button
                     key="action"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
                     onClick={handlePlayAction}
-                    className="px-3 py-1.5 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-500 active:scale-95 transition-all">
-                    Play Action
+                    className="px-3.5 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform">
+                    Action
                   </motion.button>
                 )}
                 {canBankIt && (
                   <motion.button
                     key="bank"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
                     onClick={handlePlayToBank}
-                    className="px-3 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 active:scale-95 transition-all">
-                    Bank It (${selectedCard.value}M)
+                    className="px-3.5 py-2 bg-emerald-700 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform">
+                    Bank ${selectedCard.value}M
                   </motion.button>
                 )}
                 <motion.button
                   key="cancel"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  onClick={() => setSelectedCard(null)}
-                  className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-500 active:scale-95 transition-all">
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  onClick={() => { setSelectedCard(null); setExpandedIndex(null); }}
+                  className="px-3 py-2 bg-gray-700 text-gray-300 text-xs rounded-xl active:scale-95 transition-transform">
                   Cancel
                 </motion.button>
               </>
             )}
           </AnimatePresence>
-          <button onClick={() => { setSelectedCard(null); endCurrentTurn(); }}
-            className="px-5 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white text-sm font-bold rounded-lg hover:from-orange-400 hover:to-red-500 active:scale-95 transition-all shadow-md shadow-orange-500/20 border border-orange-400/30">
+          <button onClick={() => { setSelectedCard(null); setExpandedIndex(null); endCurrentTurn(); }}
+            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform shadow-sm">
             End Turn
           </button>
         </div>
       )}
 
       {mustDiscard && (
-        <div className="text-center mb-2">
-          <span className="text-red-400 text-sm font-bold animate-pulse">Select a card to discard (hand limit: 7)</span>
+        <div className="text-center mb-1.5">
+          <span className="text-red-400 text-xs font-bold animate-pulse">Tap a card to discard (hand limit: 7)</span>
         </div>
       )}
 
-      <div className="flex justify-center overflow-x-auto pb-1">
-        <div className="relative" style={{ width: `${totalWidth}px`, height: '120px', minHeight: '120px' }}>
+      <div className="flex justify-center overflow-x-auto pb-1 -mx-2 px-2"
+           style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="relative mx-auto" style={{ width: `${totalWidth}px`, height: '108px' }}>
           <AnimatePresence>
             {player.hand.map((card, i) => {
               const isSelected = selectedCard?.id === card.id;
+              const isExpanded = expandedIndex === i;
               return (
                 <motion.div
                   key={card.id}
-                  initial={{ opacity: 0, y: 40, scale: 0.8 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{
                     opacity: 1,
-                    y: isSelected ? -16 : 0,
-                    scale: isSelected ? 1.08 : 1,
+                    y: isSelected ? -24 : isExpanded ? -12 : 0,
+                    scale: isSelected ? 1.1 : 1,
+                    x: 0,
                   }}
-                  exit={{ opacity: 0, y: -30, scale: 0.8 }}
-                  transition={{ duration: 0.25, delay: i * 0.02 }}
-                  whileHover={!isSelected && (canPlay || mustDiscard) ? { y: -10, scale: 1.05 } : {}}
-                  className="absolute top-0"
-                  style={{ left: `${i * overlapPx}px`, zIndex: isSelected ? 50 : i }}
+                  exit={{ opacity: 0, y: 30 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                  className="absolute top-2"
+                  style={{
+                    left: `${i * overlapPx}px`,
+                    zIndex: isSelected ? 100 : isExpanded ? 50 : i,
+                  }}
+                  onPointerEnter={() => {
+                    if (!isSelected && (canPlay || mustDiscard)) setExpandedIndex(i);
+                  }}
+                  onPointerLeave={() => {
+                    if (!isSelected && expandedIndex === i) setExpandedIndex(null);
+                  }}
                 >
                   <CardComponent
                     card={card}
-                    onClick={() => handleCardClick(card)}
+                    onClick={() => handleCardClick(card, i)}
                     selected={isSelected}
                     disabled={!canPlay && !mustDiscard}
+                    small
                   />
                 </motion.div>
               );
@@ -193,23 +221,23 @@ export const PlayerHand: React.FC = () => {
           </AnimatePresence>
         </div>
         {player.hand.length === 0 && (
-          <div className="text-gray-500 text-sm py-8">No cards in hand</div>
+          <div className="text-gray-500 text-xs py-6">No cards in hand</div>
         )}
       </div>
 
       {showColorPicker && selectedCard?.colors && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowColorPicker(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-8" onClick={() => setShowColorPicker(false)}>
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-gray-800 rounded-xl p-4 border border-gray-600"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-gray-800 rounded-2xl p-5 border border-gray-600 w-full max-w-sm mx-4"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-white font-bold mb-3 text-center">Choose a color</h3>
-            <div className="flex gap-2 flex-wrap justify-center">
+            <h3 className="text-white font-bold mb-4 text-center text-base">Choose a color</h3>
+            <div className="grid grid-cols-2 gap-2">
               {selectedCard.colors.map(color => (
                 <button key={color} onClick={() => handleColorChoice(color)}
-                  className={`px-4 py-2 rounded-lg font-bold text-white bg-gradient-to-br ${
+                  className={`px-4 py-3 rounded-xl font-bold text-white bg-gradient-to-br ${
                     color === 'brown' ? 'from-amber-800 to-amber-900' :
                     color === 'blue' ? 'from-blue-500 to-blue-700' :
                     color === 'green' ? 'from-green-500 to-green-700' :
@@ -220,7 +248,7 @@ export const PlayerHand: React.FC = () => {
                     color === 'teal' ? 'from-teal-400 to-teal-600' :
                     color === 'purple' ? 'from-purple-500 to-purple-700' :
                     'from-gray-700 to-gray-900'
-                  } hover:scale-105 active:scale-95 transition-all`}
+                  } active:scale-95 transition-transform text-sm`}
                 >
                   {PROPERTY_SETS[color].label}
                 </button>

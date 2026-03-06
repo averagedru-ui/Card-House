@@ -42,70 +42,69 @@ export const PropertyArea: React.FC<PropertyAreaProps> = ({ player, compact, onP
 
   if (colors.length === 0) {
     return (
-      <div className={`text-gray-500 text-xs ${compact ? 'py-1' : 'py-2'} text-center italic`}>
+      <div className={`text-gray-500 text-[11px] ${compact ? 'py-0.5' : 'py-1.5'} text-center italic`}>
         No properties
       </div>
     );
   }
 
-  const cardW = compact ? 'w-12 md:w-14' : 'w-16 md:w-20';
-  const cardH = compact ? 'h-16 md:h-20' : 'h-[5.5rem] md:h-28';
-  const headerText = compact ? 'text-[7px] md:text-[8px]' : 'text-[8px] md:text-[10px]';
-  const nameText = compact ? 'text-[6px] md:text-[7px]' : 'text-[7px] md:text-[9px]';
-  const valueText = compact ? 'text-[6px]' : 'text-[7px] md:text-[8px]';
-  const overlapOffset = compact ? 14 : 20;
+  const cardW = compact ? 'w-10' : 'w-14';
+  const cardH = compact ? 'h-14' : 'h-[4.5rem]';
+  const containerH = compact ? '3.5rem' : '4.5rem';
+  const headerText = compact ? 'text-[6px]' : 'text-[7px]';
+  const nameText = compact ? 'text-[5px]' : 'text-[7px]';
+  const valueText = compact ? 'text-[5px]' : 'text-[6px]';
+  const overlapOffset = compact ? 10 : 16;
 
   return (
-    <div className="flex flex-wrap gap-2 md:gap-3">
+    <div className="flex flex-wrap gap-1.5">
       {colors.map(color => {
         const setInfo = PROPERTY_SETS[color];
         const cards = player.properties[color];
         const isComplete = completeSets.includes(color);
         const rent = getRentAmount(player, color);
-        const stackWidth = cards.length > 1
-          ? `calc(${compact ? '3rem' : '4rem'} + ${(cards.length - 1) * overlapOffset}px)`
-          : undefined;
+        const stackW = cards.length > 1
+          ? (compact ? 40 : 56) + (cards.length - 1) * overlapOffset
+          : (compact ? 40 : 56);
 
         return (
           <div key={color} className="flex flex-col items-start">
             <div
-              className={`relative rounded-lg p-0.5 ${
+              className={`relative rounded-lg ${
                 isComplete
-                  ? 'ring-2 ring-yellow-400 shadow-md shadow-yellow-500/20'
+                  ? 'ring-1 ring-yellow-400/80 shadow-sm shadow-yellow-500/15'
                   : ''
               } ${highlightComplete && isComplete ? 'animate-pulse' : ''}`}
-              style={{ width: stackWidth, minWidth: compact ? '3rem' : '4rem' }}
+              style={{ width: `${stackW}px`, height: containerH }}
             >
-              <div className="relative overflow-hidden" style={{ height: compact ? '4rem' : '5.5rem' }}>
-                {cards.map((card, i) => (
-                  <div
-                    key={card.id}
-                    className={`absolute top-0 ${cardW} ${cardH} rounded-md border bg-gradient-to-br ${colorGradients[color]} shadow-md flex flex-col overflow-hidden ${
-                      isComplete ? 'border-yellow-400/60' : 'border-white/20'
-                    } ${onPropertyClick ? 'cursor-pointer hover:brightness-125 hover:-translate-y-0.5 transition-all' : ''}`}
-                    style={{ left: `${i * overlapOffset}px`, zIndex: i }}
-                    onClick={onPropertyClick ? () => onPropertyClick(color, card.id, player.id) : undefined}
-                  >
-                    <div className={`bg-white/20 text-center py-px ${headerText} ${textColors[color]} font-bold uppercase tracking-wide truncate px-0.5`}>
-                      {card.type === 'wildcard' ? 'WILD' : setInfo.label}
-                    </div>
-                    <div className={`flex-1 flex items-center justify-center px-0.5 ${nameText} ${textColors[color]} font-semibold text-center leading-tight`}>
-                      {card.type === 'wildcard' ? 'Wild' : card.name}
-                    </div>
-                    <div className={`bg-black/30 text-white text-center py-px ${valueText} font-mono`}>
-                      ${card.value}M
-                    </div>
+              {cards.map((card, i) => (
+                <div
+                  key={card.id}
+                  className={`absolute top-0 ${cardW} ${cardH} rounded-lg border bg-gradient-to-br ${colorGradients[color]} shadow flex flex-col overflow-hidden ${
+                    isComplete ? 'border-yellow-400/50' : 'border-white/15'
+                  } ${onPropertyClick ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+                  style={{ left: `${i * overlapOffset}px`, zIndex: i }}
+                  onClick={onPropertyClick ? () => onPropertyClick(color, card.id, player.id) : undefined}
+                >
+                  <div className={`bg-white/20 text-center ${headerText} ${textColors[color]} font-bold uppercase px-0.5 leading-relaxed`}>
+                    {card.type === 'wildcard' ? 'W' : setInfo.label.slice(0, 4)}
                   </div>
-                ))}
-              </div>
+                  <div className={`flex-1 flex items-center justify-center px-0.5 ${nameText} ${textColors[color]} font-semibold text-center leading-tight`}>
+                    {card.type === 'wildcard' ? 'Wild' : card.name.length > 8 ? card.name.slice(0, 7) + '.' : card.name}
+                  </div>
+                  <div className={`bg-black/25 text-white text-center ${valueText} font-mono leading-relaxed`}>
+                    ${card.value}M
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-1 mt-0.5 px-0.5">
-              <span className={`${compact ? 'text-[8px]' : 'text-[9px]'} text-gray-400`}>
+            <div className="flex items-center gap-0.5 mt-0.5 px-0.5">
+              <span className={`${compact ? 'text-[7px]' : 'text-[8px]'} text-gray-400`}>
                 {cards.length}/{setInfo.needed}
               </span>
-              {isComplete && <span className="text-[8px]">&#x2B50;</span>}
+              {isComplete && <span className="text-[7px]">&#x2B50;</span>}
               {!compact && (
-                <span className="text-[8px] text-gray-500">
+                <span className="text-[7px] text-gray-500">
                   ${rent}M
                   {player.hasHouse[color] && ' 🏡'}
                   {player.hasHotel[color] && ' 🏨'}

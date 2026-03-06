@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useCardGame } from '../useCardGame';
 import { getCompleteSets, getTotalBankValue } from '../engine';
 
@@ -33,55 +34,64 @@ export const GameMenu: React.FC = () => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-700/80 hover:bg-gray-600 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-800 active:bg-gray-700 transition-colors"
         aria-label="Menu"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <rect y="2" width="16" height="2" rx="1" fill="currentColor" className="text-gray-300" />
-          <rect y="7" width="16" height="2" rx="1" fill="currentColor" className="text-gray-300" />
-          <rect y="12" width="16" height="2" rx="1" fill="currentColor" className="text-gray-300" />
+          <rect y="2" width="16" height="1.5" rx="0.75" fill="currentColor" className="text-gray-400" />
+          <rect y="7.25" width="16" height="1.5" rx="0.75" fill="currentColor" className="text-gray-400" />
+          <rect y="12.5" width="16" height="1.5" rx="0.75" fill="currentColor" className="text-gray-400" />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="p-5 border-b border-gray-700">
-              <h2 className="text-white text-xl font-bold text-center">Menu</h2>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="bg-gray-800 rounded-t-3xl sm:rounded-3xl border-t sm:border border-gray-700/60 shadow-2xl w-full sm:max-w-sm overflow-hidden pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="flex justify-center pt-2 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-gray-600" />
+            </div>
+
+            <div className="px-5 py-3 border-b border-gray-700/40">
+              <h2 className="text-white text-lg font-bold text-center">Menu</h2>
             </div>
 
             {humanPlayer && (
-              <div className="px-5 py-4 border-b border-gray-700/50 bg-gray-800/50">
+              <div className="px-5 py-3">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+                  <div className="w-11 h-11 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">
                     {humanPlayer.name[0]}
                   </div>
                   <div>
-                    <p className="text-white font-semibold">{humanPlayer.name}</p>
+                    <p className="text-white font-semibold text-base">{humanPlayer.name}</p>
                     <p className="text-gray-400 text-xs">{isMultiplayer ? 'Online Game' : 'vs AI'}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-gray-700/50 rounded-lg py-2 px-1">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-gray-700/40 rounded-xl py-2.5 text-center">
                     <p className="text-yellow-400 font-bold text-lg">{completeSets.length}</p>
-                    <p className="text-gray-400 text-[10px]">Sets</p>
+                    <p className="text-gray-500 text-[10px]">Sets</p>
                   </div>
-                  <div className="bg-gray-700/50 rounded-lg py-2 px-1">
+                  <div className="bg-gray-700/40 rounded-xl py-2.5 text-center">
                     <p className="text-emerald-400 font-bold text-lg">${bankValue}M</p>
-                    <p className="text-gray-400 text-[10px]">Bank</p>
+                    <p className="text-gray-500 text-[10px]">Bank</p>
                   </div>
-                  <div className="bg-gray-700/50 rounded-lg py-2 px-1">
+                  <div className="bg-gray-700/40 rounded-xl py-2.5 text-center">
                     <p className="text-indigo-400 font-bold text-lg">{humanPlayer.hand.length}</p>
-                    <p className="text-gray-400 text-[10px]">Cards</p>
+                    <p className="text-gray-500 text-[10px]">Cards</p>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="p-4 space-y-2">
+            <div className="px-5 pb-5 pt-1 space-y-2">
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-colors"
+                className="w-full py-3.5 bg-indigo-600 active:bg-indigo-500 text-white font-bold rounded-2xl transition-colors text-sm"
               >
                 Resume Game
               </button>
@@ -89,7 +99,7 @@ export const GameMenu: React.FC = () => {
               {!isMultiplayer && (
                 <button
                   onClick={handleSaveAndQuit}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors"
+                  className="w-full py-3.5 bg-emerald-600 active:bg-emerald-500 text-white font-bold rounded-2xl transition-colors text-sm"
                 >
                   Save & Quit
                 </button>
@@ -97,12 +107,12 @@ export const GameMenu: React.FC = () => {
 
               <button
                 onClick={handleQuitWithoutSaving}
-                className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold rounded-xl transition-colors"
+                className="w-full py-3.5 bg-gray-700 active:bg-gray-600 text-gray-300 font-bold rounded-2xl transition-colors text-sm"
               >
                 {isMultiplayer ? 'Leave Game' : 'Quit Without Saving'}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </>
