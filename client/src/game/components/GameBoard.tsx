@@ -97,7 +97,7 @@ export const GameBoard: React.FC = () => {
       <ActionNotification />
 
       <div className="bg-gray-900 border-b border-gray-800 px-3 py-2 flex items-center justify-between" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <GameMenu />
           <span className="text-yellow-500 font-black text-sm tracking-tight">PROPERTY RUSH</span>
         </div>
@@ -110,6 +110,8 @@ export const GameBoard: React.FC = () => {
             <span className="text-yellow-400 text-[11px] font-bold">{completeSets.length}/3</span>
           </div>
           {isMultiplayer && <span className="text-indigo-400 text-[9px] font-semibold px-1.5 py-0.5 bg-indigo-900/40 rounded-md">LIVE</span>}
+          <GameLog />
+          <ChatPanel />
         </div>
       </div>
 
@@ -184,8 +186,6 @@ export const GameBoard: React.FC = () => {
 
       <PlayerHand />
       <ActionPanel />
-      <GameLog />
-      <ChatPanel />
     </div>
   );
 };
