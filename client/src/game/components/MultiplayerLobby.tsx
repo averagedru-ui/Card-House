@@ -9,6 +9,9 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   const [roomId, setRoomId] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [playerName, setPlayerName] = useState('');
+  const [password, setPassword] = useState('');
+  const [joinPassword, setJoinPassword] = useState('');
+  const [roomHasPassword, setRoomHasPassword] = useState(false);
   const [status, setStatus] = useState<'idle' | 'creating' | 'joining' | 'waiting' | 'error'>('idle');
   const [error, setError] = useState('');
   const [roomPlayers, setRoomPlayers] = useState<string[]>([]);
@@ -19,13 +22,15 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   const setMultiplayerState = useCardGame(s => s.setMultiplayerState);
   const addChatMessage = useCardGame(s => s.addChatMessage);
 
-  const connectWs = useCallback((action: string, room?: string, name?: string) => {
+  const connectWs = useCallback((action: string, room?: string, name?: string, pw?: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: action, roomId: room, playerName: name || playerName }));
+      const payload: any = { type: action, roomId: room, playerName: name || playerName };
+      if (pw) payload.password = pw;
+      ws.send(JSON.stringify(payload));
     };
 
     ws.onmessage = (event) => {
@@ -34,6 +39,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
         case 'room_created':
           setRoomId(msg.roomId);
           setIsHost(true);
+          setRoomHasPassword(!!msg.hasPassword);
           setStatus('waiting');
           setRoomPlayers(msg.players || [name || playerName]);
           break;
@@ -99,7 +105,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
     }
     setStatus('creating');
     setError('');
-    connectWs('create_room', undefined, playerName.trim());
+    connectWs('create_room', undefined, playerName.trim(), password.trim() || undefined);
   };
 
   const joinRoom = () => {
@@ -113,7 +119,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
     }
     setStatus('joining');
     setError('');
-    connectWs('join_room', joinCode.trim().toUpperCase(), playerName.trim());
+    connectWs('join_room', joinCode.trim().toUpperCase(), playerName.trim(), joinPassword.trim() || undefined);
   };
 
   const startGame = () => {
@@ -134,9 +140,15 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-950 to-gray-900 flex flex-col items-center py-8 px-4 overflow-y-auto">
         <div className="flex-shrink-0 my-auto bg-gray-800/80 backdrop-blur rounded-2xl p-6 md:p-8 w-full max-w-md border border-gray-700 shadow-2xl">
           <h2 className="text-white text-2xl font-bold mb-1 text-center">Lobby</h2>
-          <p className="text-center text-gray-400 text-sm mb-4">
-            Room Code: <span className="text-yellow-400 font-bold text-lg">{roomId}</span>
+          <p className="text-center text-gray-400 text-sm mb-1">
+            Room Code: <span className="text-yellow-400 font-bold text-lg tracking-widest">{roomId}</span>
           </p>
+          {roomHasPassword && (
+            <p className="text-center text-gray-500 text-xs mb-3">🔒 Password protected</p>
+          )}
+          {!roomHasPassword && (
+            <p className="text-center text-gray-600 text-xs mb-3">Share the code above to invite friends</p>
+          )}
 
           <button onClick={copyLink}
             className={`w-full py-3 rounded-xl font-bold text-sm mb-4 transition-all ${
@@ -212,6 +224,18 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
           />
         </div>
 
+        <div className="mb-2">
+          <label className="text-gray-300 text-sm font-semibold mb-1 block">Room Password <span className="text-gray-500 font-normal">(optional)</span></label>
+          <input
+            type="text"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            maxLength={20}
+            placeholder="Leave blank for no password"
+            className="w-full px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none transition-colors"
+          />
+        </div>
+
         <button onClick={createRoom}
           disabled={status === 'creating'}
           className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white font-bold text-lg rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-indigo-500/20 mb-4">
@@ -223,20 +247,30 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
           <div className="relative flex justify-center"><span className="bg-gray-800 px-3 text-gray-500 text-sm">or join</span></div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              placeholder="ROOM CODE"
+              className="flex-1 px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white text-center font-bold tracking-widest placeholder-gray-500 focus:border-indigo-500 focus:outline-none uppercase transition-colors"
+            />
+            <button onClick={joinRoom}
+              disabled={status === 'joining'}
+              className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all">
+              Join
+            </button>
+          </div>
           <input
             type="text"
-            value={joinCode}
-            onChange={e => setJoinCode(e.target.value.toUpperCase())}
-            maxLength={6}
-            placeholder="ROOM CODE"
-            className="flex-1 px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white text-center font-bold tracking-widest placeholder-gray-500 focus:border-indigo-500 focus:outline-none uppercase transition-colors"
+            value={joinPassword}
+            onChange={e => setJoinPassword(e.target.value)}
+            maxLength={20}
+            placeholder="Room password (if required)"
+            className="w-full px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none transition-colors"
           />
-          <button onClick={joinRoom}
-            disabled={status === 'joining'}
-            className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all">
-            Join
-          </button>
         </div>
 
         <button onClick={onBack}

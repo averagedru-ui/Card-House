@@ -17,6 +17,7 @@ import type { GameState, PropertyColor, Card } from "@shared/gameTypes";
 
 interface Room {
   id: string;
+  password: string | null;
   players: { ws: WebSocket; name: string; index: number }[];
   maxPlayers: number;
   gameState: GameState | null;
@@ -176,10 +177,12 @@ export async function registerRoutes(
       switch (msg.type) {
         case "create_room": {
           playerName = (msg.playerName || "Player").slice(0, 12);
+          const roomPassword = msg.password ? String(msg.password).slice(0, 20) : null;
           let roomId = generateRoomId();
           while (rooms.has(roomId)) roomId = generateRoomId();
           const room: Room = {
             id: roomId,
+            password: roomPassword,
             players: [{ ws, name: playerName, index: 0 }],
             maxPlayers: 4,
             gameState: null,
@@ -190,6 +193,7 @@ export async function registerRoutes(
           sendToPlayer(ws, {
             type: "room_created",
             roomId,
+            hasPassword: !!roomPassword,
             players: [playerName],
           });
           break;
@@ -202,6 +206,13 @@ export async function registerRoutes(
           if (!room) {
             sendToPlayer(ws, { type: "error", message: "Room not found" });
             return;
+          }
+          if (room.password) {
+            const provided = msg.password ? String(msg.password) : "";
+            if (provided !== room.password) {
+              sendToPlayer(ws, { type: "error", message: "Incorrect password" });
+              return;
+            }
           }
           if (room.isStarted) {
             sendToPlayer(ws, {

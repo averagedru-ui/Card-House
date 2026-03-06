@@ -70,6 +70,7 @@ script/
 ## Multiplayer
 - WebSocket-based real-time multiplayer via `/ws` endpoint
 - Room system with 5-character codes
+- Optional room password (set on create, required to join if set)
 - Shareable invite links (`?room=XXXXX` URL parameter)
 - Server-authoritative game state with per-player views (opponents' hands hidden)
 - 2-4 players per room
