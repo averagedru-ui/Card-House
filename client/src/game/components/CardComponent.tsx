@@ -96,16 +96,19 @@ export const CardComponent: React.FC<CardComponentProps> = ({ card, onClick, sel
 
   if (card.type === 'wildcard') {
     const colors = card.colors || [];
+    const isMultiColor = colors.length > 4;
     return (
       <div
-        className={`${baseClasses} ${interactiveClasses} ${selectedClasses} border-yellow-400/80 bg-gradient-to-br ${colors.length >= 2 ? colorMap[colors[0]] : 'from-gray-600 to-gray-800'}`}
+        className={`${baseClasses} ${interactiveClasses} ${selectedClasses} border-yellow-400/80 bg-gradient-to-br ${isMultiColor ? 'from-yellow-400 via-green-400 to-blue-500' : colors.length >= 2 ? colorMap[colors[0]] : 'from-gray-600 to-gray-800'}`}
         onClick={disabled ? undefined : onClick}
       >
         <div className={`bg-yellow-500 text-yellow-900 text-center py-0.5 font-bold uppercase tracking-wide ${small ? 'text-[9px]' : 'text-[10px]'}`}>
           Wild
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-1 gap-0.5">
-          {colors.map(c => (
+          {isMultiColor ? (
+            <div className={`text-white font-bold ${small ? 'text-[10px]' : 'text-xs'} text-center`}>Any Color</div>
+          ) : colors.map(c => (
             <div key={c} className={`${textColorMap[c]} font-semibold ${small ? 'text-[9px]' : 'text-[10px]'}`}>{PROPERTY_SETS[c].label}</div>
           ))}
         </div>

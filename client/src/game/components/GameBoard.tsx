@@ -34,7 +34,13 @@ export const GameBoard: React.FC = () => {
 
     let shouldProcess = false;
 
-    if (phase === 'action_response') {
+    if (phase === 'trade_response') {
+      const trade = useCardGame.getState().pendingTrade;
+      if (trade) {
+        const target = players.find(p => p.id === trade.toPlayerId);
+        if (target?.isAI) shouldProcess = true;
+      }
+    } else if (phase === 'action_response') {
       const responderId = pendingAction?.targetPlayerId;
       const responder = players.find(p => p.id === responderId);
       if (responder?.isAI) shouldProcess = true;

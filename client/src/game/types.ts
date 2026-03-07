@@ -9,6 +9,7 @@ export type {
   PendingAction,
   GameLogEntry,
   ChatMessage,
+  TradeProposal,
   GameState,
 } from '@shared/gameTypes';
 

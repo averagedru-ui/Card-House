@@ -1,4 +1,4 @@
-import { Card, GameState, Player, PropertyColor, GameLogEntry } from './gameTypes';
+import { Card, GameState, Player, PropertyColor, GameLogEntry, TradeProposal } from './gameTypes';
 import { createDeck, shuffleDeck, PROPERTY_SETS } from './cards';
 
 let logIdCounter = 0;
@@ -48,6 +48,7 @@ export function initializeGame(playerCount: number, playerNames?: string[]): Gam
     discardPile: [],
     cardsPlayedThisTurn: 0,
     pendingAction: null,
+    pendingTrade: null,
     winner: null,
     turnNumber: 1,
     message: players[0].isAI ? `${players[0].name}'s turn...` : 'Your turn! Draw 2 cards.',
@@ -765,6 +766,7 @@ function advanceToNextPlayer(state: GameState): GameState {
   newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
   newState.cardsPlayedThisTurn = 0;
   newState.pendingAction = null;
+  newState.pendingTrade = null;
   newState.turnNumber++;
 
   const nextPlayer = newState.players[newState.currentPlayerIndex];
@@ -774,6 +776,113 @@ function advanceToNextPlayer(state: GameState): GameState {
     : 'Your turn! Draw 2 cards.';
   addLog(newState, `${nextPlayer.name}'s turn`, 'system');
   return newState;
+}
+
+export function proposeTrade(state: GameState, trade: TradeProposal): GameState {
+  const currentPlayer = state.players[state.currentPlayerIndex];
+  if (trade.fromPlayerId !== currentPlayer.id) return state;
+  if (trade.fromPlayerId === trade.toPlayerId) return state;
+  if (trade.offeredCards.length === 0 || trade.requestedCards.length === 0) return state;
+
+  const newState = deepCopy(state);
+  const from = newState.players.find((p: Player) => p.id === trade.fromPlayerId)!;
+  const to = newState.players.find((p: Player) => p.id === trade.toPlayerId)!;
+
+  for (const item of trade.offeredCards) {
+    if (!from.properties[item.color].some((c: Card) => c.id === item.cardId)) return state;
+  }
+  for (const item of trade.requestedCards) {
+    if (!to.properties[item.color].some((c: Card) => c.id === item.cardId)) return state;
+  }
+
+  newState.pendingTrade = trade;
+  newState.phase = 'trade_response';
+  newState.message = to.isAI
+    ? `${to.name} is considering the trade...`
+    : `${from.name} wants to trade with you!`;
+  addLog(newState, `${from.name} proposes a trade with ${to.name}`, 'action');
+  return newState;
+}
+
+export function resolveTradeResponse(state: GameState, accepted: boolean): GameState {
+  const newState = deepCopy(state);
+  const trade = newState.pendingTrade;
+  if (!trade) return state;
+
+  const from = newState.players.find((p: Player) => p.id === trade.fromPlayerId)!;
+  const to = newState.players.find((p: Player) => p.id === trade.toPlayerId)!;
+
+  if (accepted) {
+    for (const item of trade.offeredCards) {
+      const idx = from.properties[item.color].findIndex((c: Card) => c.id === item.cardId);
+      if (idx !== -1) {
+        const [card] = from.properties[item.color].splice(idx, 1);
+        to.properties[item.color].push(card);
+      }
+    }
+    for (const item of trade.requestedCards) {
+      const idx = to.properties[item.color].findIndex((c: Card) => c.id === item.cardId);
+      if (idx !== -1) {
+        const [card] = to.properties[item.color].splice(idx, 1);
+        from.properties[item.color].push(card);
+      }
+    }
+    addLog(newState, `${to.name} accepted the trade with ${from.name}!`, 'action');
+    newState.cardsPlayedThisTurn++;
+  } else {
+    addLog(newState, `${to.name} rejected ${from.name}'s trade offer`, 'action');
+  }
+
+  newState.pendingTrade = null;
+  const currentPlayer = newState.players[newState.currentPlayerIndex];
+
+  if (newState.cardsPlayedThisTurn >= 3) {
+    if (currentPlayer.hand.length > 7) {
+      newState.phase = 'discard';
+      newState.message = currentPlayer.isAI
+        ? `${currentPlayer.name} is discarding...`
+        : `You have ${currentPlayer.hand.length} cards. Discard down to 7.`;
+    } else {
+      newState.pendingTrade = null;
+      return advanceToNextPlayer(newState);
+    }
+  } else {
+    newState.phase = 'play';
+    newState.message = currentPlayer.isAI
+      ? `${currentPlayer.name} is playing...`
+      : `Play up to 3 cards (${3 - newState.cardsPlayedThisTurn} remaining)`;
+  }
+
+  for (const p of newState.players) {
+    if (checkWinCondition(p)) {
+      newState.phase = 'game_over';
+      newState.winner = p.id;
+      newState.message = `${p.name} wins!`;
+      break;
+    }
+  }
+
+  return newState;
+}
+
+function aiEvaluateTrade(state: GameState, trade: TradeProposal): boolean {
+  const to = state.players.find((p: Player) => p.id === trade.toPlayerId)!;
+  let offeredValue = 0;
+  for (const item of trade.offeredCards) {
+    const from = state.players.find((p: Player) => p.id === trade.fromPlayerId)!;
+    const card = from.properties[item.color].find((c: Card) => c.id === item.cardId);
+    if (card) offeredValue += card.value;
+  }
+  let requestedValue = 0;
+  for (const item of trade.requestedCards) {
+    const card = to.properties[item.color].find((c: Card) => c.id === item.cardId);
+    if (card) {
+      requestedValue += card.value;
+      const completeSets = getCompleteSets(to);
+      if (completeSets.includes(item.color)) requestedValue += 5;
+    }
+  }
+  return offeredValue >= requestedValue;
 }
 
 export function getAIAction(state: GameState): { action: string; cardId?: string; targetColor?: PropertyColor; targetPlayerId?: number; targetCardId?: string; useJustSayNo?: boolean } {

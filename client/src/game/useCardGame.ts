@@ -18,7 +18,10 @@ import {
   getAIAction,
   getRentAmount,
   getCompleteSets,
+  proposeTrade,
+  resolveTradeResponse,
 } from './engine';
+import { TradeProposal } from './types';
 import { useProfile } from './useProfile';
 import {
   sendGameAction,
@@ -39,6 +42,7 @@ function saveToLocalStorage(state: GameState) {
       discardPile: state.discardPile,
       cardsPlayedThisTurn: state.cardsPlayedThisTurn,
       pendingAction: state.pendingAction,
+      pendingTrade: state.pendingTrade,
       winner: state.winner,
       turnNumber: state.turnNumber,
       message: state.message,
@@ -86,6 +90,8 @@ interface CardGameStore extends GameState {
   payDebt: (cardIds: string[]) => void;
   setForcedDealOffer: (color: PropertyColor, cardId: string) => void;
   respondAction: (useJustSayNo: boolean) => void;
+  startTrade: (trade: TradeProposal) => void;
+  respondTrade: (accepted: boolean) => void;
   processAITurns: () => void;
   setMultiplayerState: (state: Partial<GameState>, playerIndex: number) => void;
   setMultiplayerWs: (ws: WebSocket | null) => void;
@@ -125,6 +131,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   discardPile: [],
   cardsPlayedThisTurn: 0,
   pendingAction: null,
+  pendingTrade: null,
   winner: null,
   turnNumber: 1,
   message: '',
@@ -329,9 +336,62 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
     autoSave(newState, false);
   },
 
+  startTrade: (trade: TradeProposal) => {
+    const state = get();
+    if (state.phase !== 'play') return;
+    if (state.cardsPlayedThisTurn >= 3) return;
+    if (state.isMultiplayer) {
+      const newState = proposeTrade(state, trade);
+      processAndSyncMultiplayer(newState, get, set);
+      return;
+    }
+    const newState = proposeTrade(state, trade);
+    set(newState);
+    autoSave(newState, false);
+  },
+
+  respondTrade: (accepted: boolean) => {
+    const state = get();
+    if (state.phase !== 'trade_response') return;
+    if (state.isMultiplayer) {
+      const newState = resolveTradeResponse(state, accepted);
+      processAndSyncMultiplayer(newState, get, set);
+      return;
+    }
+    const newState = resolveTradeResponse(state, accepted);
+    set(newState);
+    autoSave(newState, false);
+  },
+
   processAITurns: () => {
     const state = get();
     if (state.isMultiplayer) return;
+
+    if (state.phase === 'trade_response') {
+      const trade = state.pendingTrade;
+      if (trade) {
+        const target = state.players.find(p => p.id === trade.toPlayerId);
+        if (target?.isAI) {
+          let offeredValue = 0;
+          for (const item of trade.offeredCards) {
+            const from = state.players.find(p => p.id === trade.fromPlayerId);
+            const card = from?.properties[item.color]?.find(c => c.id === item.cardId);
+            if (card) offeredValue += card.value;
+          }
+          let requestedValue = 0;
+          for (const item of trade.requestedCards) {
+            const card = target.properties[item.color]?.find(c => c.id === item.cardId);
+            if (card) requestedValue += card.value;
+          }
+          const accepted = offeredValue >= requestedValue;
+          const newState = resolveTradeResponse(state, accepted);
+          set(newState);
+          autoSave(newState, false);
+          return;
+        }
+      }
+      return;
+    }
 
     if (state.phase === 'action_response') {
       const responderId = state.pendingAction?.targetPlayerId;

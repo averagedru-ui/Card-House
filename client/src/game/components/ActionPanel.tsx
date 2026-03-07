@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useCardGame } from '../useCardGame';
-import { PropertyColor } from '../types';
+import { PropertyColor, TradeProposal } from '../types';
 import { PROPERTY_SETS } from '../cards';
 import { getCompleteSets, getRentAmount, getTotalBankValue } from '../engine';
 
@@ -9,14 +9,28 @@ export const ActionPanel: React.FC = () => {
   const phase = useCardGame(s => s.phase);
   const players = useCardGame(s => s.players);
   const pendingAction = useCardGame(s => s.pendingAction);
+  const pendingTrade = useCardGame(s => s.pendingTrade);
   const selectTarget = useCardGame(s => s.selectTarget);
   const payDebt = useCardGame(s => s.payDebt);
   const setForcedDealOffer = useCardGame(s => s.setForcedDealOffer);
   const respondAction = useCardGame(s => s.respondAction);
+  const startTrade = useCardGame(s => s.startTrade);
+  const respondTrade = useCardGame(s => s.respondTrade);
   const currentPlayerIndex = useCardGame(s => s.currentPlayerIndex);
   const myPlayerIndex = useCardGame(s => s.myPlayerIndex);
+  const cardsPlayedThisTurn = useCardGame(s => s.cardsPlayedThisTurn);
 
   const [selectedPayCards, setSelectedPayCards] = useState<string[]>([]);
+  const [showTradeModal, setShowTradeModal] = useState(false);
+  const [tradeStep, setTradeStep] = useState<'pick_mine' | 'pick_opponent' | 'pick_theirs'>('pick_mine');
+  const [tradeMyCard, setTradeMyCard] = useState<{ color: PropertyColor; cardId: string } | null>(null);
+  const [tradeOpponentId, setTradeOpponentId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handler = () => setShowTradeModal(true);
+    window.addEventListener('open-trade-modal', handler);
+    return () => window.removeEventListener('open-trade-modal', handler);
+  }, []);
 
   const humanPlayer = players[myPlayerIndex];
   if (!humanPlayer) return null;
@@ -449,6 +463,163 @@ export const ActionPanel: React.FC = () => {
                 </>
               )}
             </div>
+          </motion.div>
+        </div>
+      );
+    }
+  }
+
+  if (phase === 'trade_response' && pendingTrade && pendingTrade.toPlayerId === humanPlayer.id) {
+    const fromPlayer = players.find(p => p.id === pendingTrade.fromPlayerId);
+    const offeredCards = pendingTrade.offeredCards.map(item => {
+      const card = fromPlayer?.properties[item.color]?.find(c => c.id === item.cardId);
+      return { ...item, name: card?.name || 'Unknown', label: PROPERTY_SETS[item.color].label };
+    });
+    const requestedCards = pendingTrade.requestedCards.map(item => {
+      const card = humanPlayer.properties[item.color]?.find(c => c.id === item.cardId);
+      return { ...item, name: card?.name || 'Unknown', label: PROPERTY_SETS[item.color].label };
+    });
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="bg-gray-800 rounded-2xl p-5 max-w-md w-full border border-purple-500/30">
+          <h3 className="text-white text-lg font-bold mb-3 text-center">Trade Proposal</h3>
+          <p className="text-gray-400 text-sm text-center mb-4">{fromPlayer?.name} wants to trade with you</p>
+          <div className="mb-3">
+            <p className="text-purple-400 text-xs font-semibold mb-1">They offer:</p>
+            {offeredCards.map(c => (
+              <div key={c.cardId} className="py-1.5 px-3 rounded-lg bg-gray-700 text-white text-sm mb-1 flex justify-between">
+                <span>{c.name}</span>
+                <span className="text-gray-400 text-xs">{c.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mb-4">
+            <p className="text-red-400 text-xs font-semibold mb-1">They want:</p>
+            {requestedCards.map(c => (
+              <div key={c.cardId} className="py-1.5 px-3 rounded-lg bg-gray-700 text-white text-sm mb-1 flex justify-between">
+                <span>{c.name}</span>
+                <span className="text-gray-400 text-xs">{c.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => respondTrade(false)}
+              className="flex-1 py-2.5 rounded-xl bg-gray-700 text-white font-bold active:scale-95 transition-transform">
+              Reject
+            </button>
+            <button onClick={() => respondTrade(true)}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold active:scale-95 transition-transform">
+              Accept
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (phase === 'play' && currentPlayerIndex === myPlayerIndex && showTradeModal) {
+    const myProperties: { color: PropertyColor; cardId: string; cardName: string }[] = [];
+    for (const color of Object.keys(humanPlayer.properties) as PropertyColor[]) {
+      for (const card of humanPlayer.properties[color]) {
+        myProperties.push({ color, cardId: card.id, cardName: card.name });
+      }
+    }
+
+    const opponents = players.filter(p => p.id !== humanPlayer.id);
+
+    const resetTrade = () => {
+      setShowTradeModal(false);
+      setTradeStep('pick_mine');
+      setTradeMyCard(null);
+      setTradeOpponentId(null);
+    };
+
+    if (tradeStep === 'pick_mine') {
+      return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-800 rounded-2xl p-4 max-w-md w-full border border-purple-500/30 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-white text-lg font-bold mb-3">Choose your property to offer</h3>
+            {myProperties.length === 0 ? (
+              <p className="text-gray-400 text-sm mb-3">You have no properties to trade!</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {myProperties.map(item => (
+                  <button key={item.cardId} onClick={() => { setTradeMyCard({ color: item.color, cardId: item.cardId }); setTradeStep('pick_opponent'); }}
+                    className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
+                    <span>{item.cardName}</span>
+                    <span className="text-gray-400 text-xs">{PROPERTY_SETS[item.color].label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={resetTrade} className="w-full mt-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Cancel</button>
+          </motion.div>
+        </div>
+      );
+    }
+
+    if (tradeStep === 'pick_opponent') {
+      return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-800 rounded-2xl p-4 max-w-md w-full border border-purple-500/30">
+            <h3 className="text-white text-lg font-bold mb-3">Trade with who?</h3>
+            <div className="flex flex-col gap-1.5">
+              {opponents.map(opp => {
+                const hasProps = (Object.keys(opp.properties) as PropertyColor[]).some(c => opp.properties[c].length > 0);
+                return (
+                  <button key={opp.id} onClick={() => { if (hasProps) { setTradeOpponentId(opp.id); setTradeStep('pick_theirs'); } }}
+                    disabled={!hasProps}
+                    className={`py-2 px-3 rounded-lg text-sm font-medium flex justify-between items-center transition-all ${hasProps ? 'bg-gray-700 text-white hover:bg-gray-600 active:scale-95' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}>
+                    <span>{opp.name}</span>
+                    {!hasProps && <span className="text-gray-500 text-xs">No properties</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setTradeStep('pick_mine')} className="w-full mt-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Back</button>
+          </motion.div>
+        </div>
+      );
+    }
+
+    if (tradeStep === 'pick_theirs' && tradeOpponentId !== null) {
+      const opponent = players.find(p => p.id === tradeOpponentId)!;
+      const oppProperties: { color: PropertyColor; cardId: string; cardName: string }[] = [];
+      for (const color of Object.keys(opponent.properties) as PropertyColor[]) {
+        for (const card of opponent.properties[color]) {
+          oppProperties.push({ color, cardId: card.id, cardName: card.name });
+        }
+      }
+
+      return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            className="bg-gray-800 rounded-2xl p-4 max-w-md w-full border border-purple-500/30 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-white text-lg font-bold mb-3">Choose what you want from {opponent.name}</h3>
+            <div className="flex flex-col gap-1.5">
+              {oppProperties.map(item => (
+                <button key={item.cardId} onClick={() => {
+                  if (tradeMyCard) {
+                    startTrade({
+                      fromPlayerId: humanPlayer.id,
+                      toPlayerId: tradeOpponentId,
+                      offeredCards: [tradeMyCard],
+                      requestedCards: [{ color: item.color, cardId: item.cardId }],
+                    });
+                    resetTrade();
+                  }
+                }}
+                  className="py-2 px-3 rounded-lg bg-gray-700 text-white text-sm font-medium hover:bg-gray-600 active:scale-95 flex justify-between items-center transition-all">
+                  <span>{item.cardName}</span>
+                  <span className="text-gray-400 text-xs">{PROPERTY_SETS[item.color].label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setTradeStep('pick_opponent')} className="w-full mt-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">Back</button>
           </motion.div>
         </div>
       );

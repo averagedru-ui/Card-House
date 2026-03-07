@@ -16,4 +16,6 @@ export {
   endTurn,
   discardCard,
   getAIAction,
+  proposeTrade,
+  resolveTradeResponse,
 } from '@shared/engine';

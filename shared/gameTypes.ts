@@ -60,6 +60,8 @@ export type GamePhase =
   | 'action_response'
   | 'pay_debt'
   | 'forced_deal_pick'
+  | 'trade_proposal'
+  | 'trade_response'
   | 'game_over';
 
 export interface PendingAction {
@@ -90,6 +92,13 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface TradeProposal {
+  fromPlayerId: number;
+  toPlayerId: number;
+  offeredCards: { color: PropertyColor; cardId: string }[];
+  requestedCards: { color: PropertyColor; cardId: string }[];
+}
+
 export interface GameState {
   phase: GamePhase;
   players: Player[];
@@ -98,6 +107,7 @@ export interface GameState {
   discardPile: Card[];
   cardsPlayedThisTurn: number;
   pendingAction: PendingAction | null;
+  pendingTrade: TradeProposal | null;
   winner: number | null;
   turnNumber: number;
   message: string;

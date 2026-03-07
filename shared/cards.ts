@@ -67,12 +67,17 @@ export function createDeck(): Card[] {
   deck.push(propertyCard('B&O RR', 'black', 2));
   deck.push(propertyCard('Short Line', 'black', 2));
 
-  deck.push(wildcardProperty(['brown', 'teal'], 1));
-  deck.push(wildcardProperty(['green', 'blue'], 4));
+  deck.push(wildcardProperty(['pink', 'orange'], 2));
+  deck.push(wildcardProperty(['pink', 'orange'], 2));
+  deck.push(wildcardProperty(['teal', 'brown'], 1));
+  deck.push(wildcardProperty(['teal', 'black'], 4));
+  deck.push(wildcardProperty(['blue', 'green'], 4));
+  deck.push(wildcardProperty(['black', 'green'], 4));
   deck.push(wildcardProperty(['red', 'yellow'], 3));
-  deck.push(wildcardProperty(['orange', 'pink'], 2));
-  deck.push(wildcardProperty(['black', 'purple'], 2));
-  deck.push(wildcardProperty(['green', 'red'], 3));
+  deck.push(wildcardProperty(['red', 'yellow'], 3));
+  deck.push(wildcardProperty(['purple', 'black'], 2));
+  deck.push(wildcardProperty(['brown', 'teal', 'pink', 'orange', 'red', 'yellow', 'green', 'blue', 'black', 'purple'], 0));
+  deck.push(wildcardProperty(['brown', 'teal', 'pink', 'orange', 'red', 'yellow', 'green', 'blue', 'black', 'purple'], 0));
 
   for (let i = 0; i < 6; i++) deck.push(moneyCard(1));
   for (let i = 0; i < 5; i++) deck.push(moneyCard(2));
@@ -81,9 +86,9 @@ export function createDeck(): Card[] {
   for (let i = 0; i < 2; i++) deck.push(moneyCard(5));
   for (let i = 0; i < 1; i++) deck.push(moneyCard(10));
 
-  for (let i = 0; i < 3; i++) deck.push(actionCard('Pass Go', 1, 'pass_go', 'Draw 2 extra cards'));
+  for (let i = 0; i < 10; i++) deck.push(actionCard('Pass Go', 1, 'pass_go', 'Draw 2 extra cards'));
   for (let i = 0; i < 3; i++) deck.push(actionCard('Debt Collector', 3, 'debt_collector', 'Force one player to pay you $5M'));
-  for (let i = 0; i < 2; i++) deck.push(actionCard('Birthday!', 2, 'birthday', 'All players pay you $2M'));
+  for (let i = 0; i < 3; i++) deck.push(actionCard('Birthday!', 2, 'birthday', 'All players pay you $2M'));
   for (let i = 0; i < 3; i++) deck.push(actionCard('Sly Deal', 3, 'sly_deal', 'Steal a property from another player'));
   for (let i = 0; i < 3; i++) deck.push(actionCard('Forced Deal', 3, 'forced_deal', 'Swap a property with another player'));
   for (let i = 0; i < 2; i++) deck.push(actionCard('Deal Breaker', 5, 'deal_breaker', 'Steal a complete property set'));

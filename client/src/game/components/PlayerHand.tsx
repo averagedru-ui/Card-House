@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, PropertyColor } from '../types';
 import { CardComponent } from './CardComponent';
@@ -22,6 +22,15 @@ export const PlayerHand: React.FC = () => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const player = players[myPlayerIndex];
+
+  const hasTradeableProperties = useMemo(() => {
+    if (!player) return false;
+    const myProps = (Object.keys(player.properties) as PropertyColor[]).some(c => player.properties[c].length > 0);
+    const oppProps = players.filter(p => p.id !== player.id).some(p =>
+      (Object.keys(p.properties) as PropertyColor[]).some(c => p.properties[c].length > 0)
+    );
+    return myProps && oppProps;
+  }, [player, players]);
 
   useEffect(() => {
     if (selectedCard && player) {
@@ -164,6 +173,12 @@ export const PlayerHand: React.FC = () => {
               </>
             )}
           </AnimatePresence>
+          {cardsPlayedThisTurn < 3 && hasTradeableProperties && (
+            <button onClick={() => { setSelectedCard(null); setExpandedIndex(null); window.dispatchEvent(new Event('open-trade-modal')); }}
+              className="px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform shadow-sm">
+              Trade
+            </button>
+          )}
           <button onClick={() => { setSelectedCard(null); setExpandedIndex(null); endCurrentTurn(); }}
             className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xs font-bold rounded-xl active:scale-95 transition-transform shadow-sm">
             End Turn
@@ -234,7 +249,7 @@ export const PlayerHand: React.FC = () => {
             onClick={e => e.stopPropagation()}
           >
             <h3 className="text-white font-bold mb-4 text-center text-base">Choose a color</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${selectedCard.colors.length > 4 ? 'grid-cols-2' : 'grid-cols-2'}`}>
               {selectedCard.colors.map(color => (
                 <button key={color} onClick={() => handleColorChoice(color)}
                   className={`px-4 py-3 rounded-xl font-bold text-white bg-gradient-to-br ${
@@ -247,6 +262,7 @@ export const PlayerHand: React.FC = () => {
                     color === 'pink' ? 'from-pink-400 to-pink-600' :
                     color === 'teal' ? 'from-teal-400 to-teal-600' :
                     color === 'purple' ? 'from-purple-500 to-purple-700' :
+                    color === 'black' ? 'from-gray-700 to-gray-900' :
                     'from-gray-700 to-gray-900'
                   } active:scale-95 transition-transform text-sm`}
                 >

@@ -55,11 +55,15 @@ script/
 ## Game Rules
 - 2-4 players (1 human + AI opponents, or all human via multiplayer)
 - Draw 2 cards per turn, play up to 3
+- Official 106-card deck: 28 property, 11 wildcard (incl 2 ten-color), 20 money, 32 action, 13 rent, 2 Double Rent
 - Card types: Property, Money, Action, Wildcard
-- Actions: Pass Go, Debt Collector, Birthday, Sly Deal, Forced Deal, Deal Breaker, Rent, House, Hotel, Just Say No
+- Actions: Pass Go (10), Debt Collector (3), Birthday (3), Sly Deal (3), Forced Deal (3), Deal Breaker (2), Just Say No (3), House (3), Hotel (2), Double Rent (2)
+- Rent cards: 5 two-color pairs (10 cards) + 3 Wild Rent
+- Property wildcards: 2 Pink/Orange, 1 Teal/Brown, 1 Teal/Railroad, 1 Blue/Green, 1 Railroad/Green, 2 Red/Yellow, 1 Utility/Railroad, 2 ten-color wildcards
 - Win by collecting 3 complete property sets
 - Cards can be banked as money regardless of type
 - Just Say No defensively blocks targeted actions (Sly Deal, Deal Breaker, Forced Deal, Debt Collector, Rent)
+- Free-form property trading: during play phase, propose 1-for-1 property swaps with opponents (counts as 1 action)
 
 ## Game Persistence
 - Solo games auto-save to localStorage (debounced 500ms)
