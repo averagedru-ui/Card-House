@@ -137,8 +137,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onMultiplayer, onRules, onPr
               onClick={onProfile}
               className="py-2.5 bg-gray-700/60 active:bg-gray-600 text-gray-300 font-semibold text-xs rounded-xl transition-colors flex flex-col items-center gap-1"
             >
-              <span className="text-base">📊</span>
-              Stats
+              <span className="text-base">👤</span>
+              Profile
             </button>
           </div>
         </div>
