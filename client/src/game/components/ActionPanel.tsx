@@ -14,6 +14,7 @@ export const ActionPanel: React.FC = () => {
   const payDebt = useCardGame(s => s.payDebt);
   const setForcedDealOffer = useCardGame(s => s.setForcedDealOffer);
   const respondAction = useCardGame(s => s.respondAction);
+  const cancelAction = useCardGame(s => s.cancelAction);
   const startTrade = useCardGame(s => s.startTrade);
   const respondTrade = useCardGame(s => s.respondTrade);
   const currentPlayerIndex = useCardGame(s => s.currentPlayerIndex);
@@ -244,7 +245,7 @@ export const ActionPanel: React.FC = () => {
 
   if (phase === 'action_target' && currentPlayerIndex === myPlayerIndex && pendingAction) {
     if (pendingAction.type === 'debt_collector') {
-      const opponents = players.filter(p => p.id !== myPlayerIndex);
+      const opponents = players.filter(p => p.id !== humanPlayer.id);
       return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
@@ -257,6 +258,9 @@ export const ActionPanel: React.FC = () => {
                   <span className="text-emerald-400 text-sm">Bank: ${getTotalBankValue(opp)}M</span>
                 </button>
               ))}
+              <button onClick={cancelAction} className="py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all mt-1">
+                Cancel
+              </button>
             </div>
           </motion.div>
         </div>
@@ -264,7 +268,7 @@ export const ActionPanel: React.FC = () => {
     }
 
     if (pendingAction.type === 'sly_deal') {
-      const opponents = players.filter(p => p.id !== myPlayerIndex);
+      const opponents = players.filter(p => p.id !== humanPlayer.id);
       const stealable: { playerId: number; playerName: string; color: PropertyColor; cardId: string; cardName: string }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -311,13 +315,16 @@ export const ActionPanel: React.FC = () => {
                 </button>
               ))}
             </div>
+            <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+              Cancel
+            </button>
           </motion.div>
         </div>
       );
     }
 
     if (pendingAction.type === 'forced_deal' && pendingAction.offeredProperty) {
-      const opponents = players.filter(p => p.id !== myPlayerIndex);
+      const opponents = players.filter(p => p.id !== humanPlayer.id);
       const stealable: { playerId: number; playerName: string; color: PropertyColor; cardId: string; cardName: string }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -365,13 +372,16 @@ export const ActionPanel: React.FC = () => {
                 </button>
               ))}
             </div>
+            <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+              Cancel
+            </button>
           </motion.div>
         </div>
       );
     }
 
     if (pendingAction.type === 'deal_breaker') {
-      const opponents = players.filter(p => p.id !== myPlayerIndex);
+      const opponents = players.filter(p => p.id !== humanPlayer.id);
       const stealableSets: { playerId: number; playerName: string; color: PropertyColor }[] = [];
       for (const opp of opponents) {
         const completeSets = getCompleteSets(opp);
@@ -418,6 +428,9 @@ export const ActionPanel: React.FC = () => {
                 </button>
               ))}
             </div>
+            <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+              Cancel
+            </button>
           </motion.div>
         </div>
       );
@@ -437,7 +450,7 @@ export const ActionPanel: React.FC = () => {
 
       if (isWildRent && chosenColor) {
         // Step 2: pick which player to charge
-        const opponents = players.filter(p => p.id !== myPlayerIndex);
+        const opponents = players.filter(p => p.id !== humanPlayer.id);
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-gray-800 rounded-2xl p-4 md:p-6 max-w-md w-full border border-gray-600">
@@ -455,6 +468,9 @@ export const ActionPanel: React.FC = () => {
                   </button>
                 ))}
               </div>
+              <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+                Cancel
+              </button>
             </motion.div>
           </div>
         );
@@ -473,7 +489,6 @@ export const ActionPanel: React.FC = () => {
                 <button key={color}
                   onClick={() => {
                     if (isWildRent) {
-                      // Store chosen color in pendingAction for next step
                       useCardGame.setState(s => ({
                         pendingAction: s.pendingAction ? { ...s.pendingAction, chosenRentColor: color } as any : null,
                       }));
@@ -507,6 +522,11 @@ export const ActionPanel: React.FC = () => {
                 </>
               )}
             </div>
+            {availableColors.length > 0 && (
+              <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+                Cancel
+              </button>
+            )}
           </motion.div>
         </div>
       );
@@ -575,23 +595,12 @@ export const ActionPanel: React.FC = () => {
                 </button>
               ))}
               {myProperties.length === 0 && (
-                <>
-                  <p className="text-gray-400 text-sm">No properties to offer!</p>
-                  <button
-                    onClick={() => {
-                      useCardGame.setState((s) => ({
-                        pendingAction: null,
-                        phase: 'play' as const,
-                        message: `Play up to 3 cards (${3 - s.cardsPlayedThisTurn} remaining)`,
-                      }));
-                    }}
-                    className="w-full py-2 mt-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                  >
-                    Cancel
-                  </button>
-                </>
+                <p className="text-gray-400 text-sm">No properties to offer!</p>
               )}
             </div>
+            <button onClick={cancelAction} className="w-full mt-3 py-2 px-4 rounded-xl bg-gray-700/50 text-gray-400 text-sm font-medium hover:bg-gray-700 active:scale-95 transition-all">
+              Cancel
+            </button>
           </motion.div>
         </div>
       );
