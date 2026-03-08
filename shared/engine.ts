@@ -546,6 +546,8 @@ export function cancelPendingAction(state: GameState): GameState {
     : `Play up to 3 cards (${3 - newState.cardsPlayedThisTurn} remaining)`;
   return newState;
 }
+
+export function resolveDebtPayment(state: GameState, payerId: number, cardIds: string[]): GameState {
   const newState = deepCopy(state);
   const payer = newState.players.find((p: Player) => p.id === payerId)!;
   const receiver = newState.players.find((p: Player) => p.id === newState.pendingAction!.sourcePlayerId)!;
