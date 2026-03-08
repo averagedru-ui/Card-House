@@ -64,7 +64,10 @@ export function drawCards(state: GameState, count: number = 2): GameState {
   const newState = deepCopy(state);
   const player = newState.players[newState.currentPlayerIndex];
 
-  for (let i = 0; i < count; i++) {
+  // Rule: if player has no cards, draw 5 instead of 2
+  const actualCount = player.hand.length === 0 ? 5 : count;
+
+  for (let i = 0; i < actualCount; i++) {
     if (newState.drawPile.length === 0) {
       newState.drawPile = shuffleDeck(newState.discardPile);
       newState.discardPile = [];
@@ -75,7 +78,7 @@ export function drawCards(state: GameState, count: number = 2): GameState {
     }
   }
 
-  addLog(newState, `${player.name} drew ${count} cards`, 'system');
+  addLog(newState, `${player.name} drew ${actualCount} card${actualCount !== 1 ? 's' : ''}`, 'system');
   newState.phase = 'play';
   newState.message = player.isAI
     ? `${player.name} is thinking...`
@@ -219,6 +222,9 @@ export function playPropertyCard(state: GameState, cardId: string, targetColor?:
   return newState;
 }
 
+// Colors that cannot have houses or hotels
+const NO_HOUSE_HOTEL_COLORS: PropertyColor[] = ['black', 'purple'];
+
 export function playActionCard(state: GameState, cardId: string): GameState | { state: GameState; needsTarget: boolean; needsColorChoice?: boolean } {
   const newState = deepCopy(state);
   const player = newState.players[newState.currentPlayerIndex];
@@ -234,7 +240,7 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
       newState.cardsPlayedThisTurn++;
       addLog(newState, `${player.name} played Pass Go`, 'action');
       const result = drawCards(newState, 2);
-      if (newState.cardsPlayedThisTurn >= 3) return endTurn(result);
+      if (result.cardsPlayedThisTurn >= 3) return endTurn(result);
       return result;
     }
 
@@ -303,6 +309,15 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
     }
 
     case 'deal_breaker': {
+      // Check if any opponent has a complete set before consuming the card play
+      const anyCompleteSet = newState.players
+        .filter((p: Player) => p.id !== player.id)
+        .some((p: Player) => getCompleteSets(p).length > 0);
+      if (!anyCompleteSet) {
+        newState.message = 'No opponent has a complete set to steal!';
+        newState.phase = 'play';
+        return newState;
+      }
       player.hand.splice(cardIndex, 1);
       newState.discardPile.push(card);
       newState.cardsPlayedThisTurn++;
@@ -340,17 +355,38 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
         type: card.actionType!,
         sourcePlayerId: player.id,
         card,
+        // doubleRent: check if player has double rent in hand (will be applied at color selection)
+        canSayNo: false,
       };
       newState.phase = 'action_target';
       newState.message = player.isAI ? `${player.name} charges rent!` : 'Choose which color to charge rent on';
       return { state: newState, needsTarget: true, needsColorChoice: true };
     }
 
+    case 'double_rent': {
+      // Double Rent must be played right after a Rent card. Check if a rent was just set up.
+      // If the pending action is a rent color selection, apply double. Otherwise bank it.
+      // In practice, double_rent is played FROM HAND during the play phase, triggering a
+      // "pending double rent" that applies to the next rent card played this turn.
+      player.hand.splice(cardIndex, 1);
+      newState.discardPile.push(card);
+      newState.cardsPlayedThisTurn++;
+      // Mark that next rent played this turn is doubled
+      (newState as any).pendingDoubleRent = ((newState as any).pendingDoubleRent || 0) + 1;
+      addLog(newState, `${player.name} played Double Rent! Next rent is doubled`, 'action');
+      if (newState.cardsPlayedThisTurn >= 3) return endTurn(newState);
+      newState.phase = 'play';
+      newState.message = player.isAI
+        ? `${player.name} is thinking...`
+        : `Double Rent active! Play a Rent card now (${3 - newState.cardsPlayedThisTurn} plays left)`;
+      return newState;
+    }
+
     case 'house': {
-      const completeSets = getCompleteSets(player);
+      const completeSets = getCompleteSets(player).filter(c => !NO_HOUSE_HOTEL_COLORS.includes(c));
       const eligible = completeSets.filter((c: PropertyColor) => !player.hasHouse[c]);
       if (eligible.length === 0) {
-        newState.message = 'No complete sets to add a house to!';
+        newState.message = 'No eligible complete sets to add a house to! (Railroads and Utilities cannot have houses)';
         return newState;
       }
       player.hand.splice(cardIndex, 1);
@@ -374,10 +410,10 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
     }
 
     case 'hotel': {
-      const completeSetsH = getCompleteSets(player);
+      const completeSetsH = getCompleteSets(player).filter(c => !NO_HOUSE_HOTEL_COLORS.includes(c));
       const eligibleH = completeSetsH.filter((c: PropertyColor) => player.hasHouse[c] && !player.hasHotel[c]);
       if (eligibleH.length === 0) {
-        newState.message = 'No sets with houses to add a hotel to!';
+        newState.message = 'No sets with houses to add a hotel to! (Railroads and Utilities cannot have hotels)';
         return newState;
       }
       player.hand.splice(cardIndex, 1);
@@ -398,19 +434,6 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
       newState.phase = 'action_target';
       newState.message = 'Choose a set to add a hotel to';
       return { state: newState, needsTarget: true };
-    }
-
-    case 'double_rent': {
-      player.hand.splice(cardIndex, 1);
-      player.bank.push({ ...card, type: 'money' as const });
-      newState.cardsPlayedThisTurn++;
-      addLog(newState, `${player.name} banked Double Rent ($${card.value}M)`, 'money');
-      if (newState.cardsPlayedThisTurn >= 3) return endTurn(newState);
-      newState.phase = 'play';
-      newState.message = player.isAI
-        ? `${player.name} is thinking...`
-        : `Play up to 3 cards (${3 - newState.cardsPlayedThisTurn} remaining)`;
-      return newState;
     }
   }
 
@@ -592,7 +615,7 @@ export function resolveTargetAction(state: GameState, targetPlayerId: number, ta
     case 'rent':
     case 'wild_rent': {
       if (!targetColor) return state;
-      const rentAmount = getRentAmount(source, targetColor);
+      let rentAmount = getRentAmount(source, targetColor);
       if (rentAmount === 0) {
         newState.pendingAction = null;
         newState.message = 'No rent to charge!';
@@ -600,17 +623,49 @@ export function resolveTargetAction(state: GameState, targetPlayerId: number, ta
         newState.phase = 'play';
         return newState;
       }
-      const otherPlayers = newState.players.filter((p: Player) => p.id !== source.id).map((p: Player) => p.id);
-      newState.pendingAction = {
-        type: 'rent',
-        sourcePlayerId: source.id,
-        amount: rentAmount,
-        respondingPlayers: [...otherPlayers],
-        currentResponder: otherPlayers[0],
-        card: action.card,
-      };
-      addLog(newState, `${source.name} charges $${rentAmount}M rent on ${PROPERTY_SETS[targetColor].label}!`, 'rent');
-      return transitionToPayOrResponse(newState);
+      // Apply Double Rent multiplier if active
+      const doubleCount = (newState as any).pendingDoubleRent || 0;
+      if (doubleCount > 0) {
+        rentAmount = rentAmount * Math.pow(2, doubleCount);
+        (newState as any).pendingDoubleRent = 0;
+        addLog(newState, `Double Rent applied! Rent is now $${rentAmount}M`, 'action');
+      }
+
+      // Wild Rent = charge ONE chosen player. Dual-color Rent = charge ALL other players.
+      if (action.type === 'wild_rent') {
+        // targetPlayerId was set when the player chose the opponent in UI
+        const targetId = targetPlayerId ?? newState.players.find((p: Player) => p.id !== source.id)?.id;
+        if (targetId === undefined) {
+          newState.pendingAction = null;
+          if (newState.cardsPlayedThisTurn >= 3) return endTurn(newState);
+          newState.phase = 'play';
+          return newState;
+        }
+        const wildTarget = newState.players.find((p: Player) => p.id === targetId)!;
+        newState.pendingAction = {
+          type: 'rent',
+          sourcePlayerId: source.id,
+          amount: rentAmount,
+          respondingPlayers: [targetId],
+          currentResponder: targetId,
+          card: action.card,
+        };
+        addLog(newState, `${source.name} charges ${wildTarget.name} $${rentAmount}M rent on ${PROPERTY_SETS[targetColor].label}!`, 'rent');
+        return transitionToPayOrResponse(newState);
+      } else {
+        // Standard dual-color rent — all other players pay
+        const otherPlayers = newState.players.filter((p: Player) => p.id !== source.id).map((p: Player) => p.id);
+        newState.pendingAction = {
+          type: 'rent',
+          sourcePlayerId: source.id,
+          amount: rentAmount,
+          respondingPlayers: [...otherPlayers],
+          currentResponder: otherPlayers[0],
+          card: action.card,
+        };
+        addLog(newState, `${source.name} charges $${rentAmount}M rent on ${PROPERTY_SETS[targetColor].label}!`, 'rent');
+        return transitionToPayOrResponse(newState);
+      }
     }
 
     case 'house': {
@@ -668,6 +723,21 @@ export function resolveActionResponse(state: GameState, useJustSayNo: boolean): 
     }
     addLog(newState, `${target.name} blocks with Just Say No!`, 'action');
 
+    // Check if the SOURCE (original attacker) has a JSN to counter
+    if (playerHasJustSayNo(source)) {
+      // Swap roles: now source can respond to target's JSN
+      newState.phase = 'action_response';
+      // Temporarily swap targetPlayerId to point at source so ActionPanel shows for them
+      newState.pendingAction!.targetPlayerId = source.id;
+      // Store who blocked so we know what to do if source also says no
+      newState.pendingAction!.blockedPlayers = [...(action.blockedPlayers || []), targetId];
+      newState.message = source.isAI
+        ? `${source.name} considers countering the Just Say No...`
+        : `${target.name} blocked with Just Say No! Play your own Just Say No to counter?`;
+      return newState;
+    }
+
+    // No counter available — action is fully blocked
     if (['debt_collector', 'sly_deal', 'deal_breaker', 'forced_deal'].includes(action.type)) {
       return returnToPlay(newState);
     }
@@ -684,6 +754,14 @@ export function resolveActionResponse(state: GameState, useJustSayNo: boolean): 
 
     return returnToPlay(newState);
   } else {
+    // Check if we're resolving a counter-JSN situation (source declining to counter)
+    if (action.blockedPlayers && action.blockedPlayers.length > 0) {
+      // Source chose NOT to counter — action remains blocked, return to play
+      addLog(newState, `${source.name} accepts the block`, 'system');
+      newState.pendingAction!.blockedPlayers = [];
+      return returnToPlay(newState);
+    }
+
     addLog(newState, `${target.name} accepts the action`, 'system');
 
     switch (action.type) {
@@ -768,6 +846,8 @@ function advanceToNextPlayer(state: GameState): GameState {
   newState.pendingAction = null;
   newState.pendingTrade = null;
   newState.turnNumber++;
+  // Clear any pending double rent from previous turn
+  (newState as any).pendingDoubleRent = 0;
 
   const nextPlayer = newState.players[newState.currentPlayerIndex];
   newState.phase = 'draw';
@@ -828,7 +908,7 @@ export function resolveTradeResponse(state: GameState, accepted: boolean): GameS
       }
     }
     addLog(newState, `${to.name} accepted the trade with ${from.name}!`, 'action');
-    newState.cardsPlayedThisTurn++;
+    // Trades do NOT count as a card play (it's a negotiation, not a card action)
   } else {
     addLog(newState, `${to.name} rejected ${from.name}'s trade offer`, 'action');
   }
@@ -836,31 +916,21 @@ export function resolveTradeResponse(state: GameState, accepted: boolean): GameS
   newState.pendingTrade = null;
   const currentPlayer = newState.players[newState.currentPlayerIndex];
 
-  if (newState.cardsPlayedThisTurn >= 3) {
-    if (currentPlayer.hand.length > 7) {
-      newState.phase = 'discard';
-      newState.message = currentPlayer.isAI
-        ? `${currentPlayer.name} is discarding...`
-        : `You have ${currentPlayer.hand.length} cards. Discard down to 7.`;
-    } else {
-      newState.pendingTrade = null;
-      return advanceToNextPlayer(newState);
-    }
-  } else {
-    newState.phase = 'play';
-    newState.message = currentPlayer.isAI
-      ? `${currentPlayer.name} is playing...`
-      : `Play up to 3 cards (${3 - newState.cardsPlayedThisTurn} remaining)`;
-  }
-
+  // Check win condition after trade
   for (const p of newState.players) {
     if (checkWinCondition(p)) {
       newState.phase = 'game_over';
       newState.winner = p.id;
       newState.message = `${p.name} wins!`;
-      break;
+      return newState;
     }
   }
+
+  // Return to play — trades don't consume play actions
+  newState.phase = 'play';
+  newState.message = currentPlayer.isAI
+    ? `${currentPlayer.name} is playing...`
+    : `Play up to 3 cards (${3 - newState.cardsPlayedThisTurn} remaining)`;
 
   return newState;
 }
@@ -891,14 +961,24 @@ export function getAIAction(state: GameState): { action: string; cardId?: string
   if (state.phase === 'action_response') {
     const responderId = state.pendingAction?.targetPlayerId;
     const responder = state.players.find((p: Player) => p.id === responderId);
+    const isCounterJsn = (state.pendingAction as any)?.blockedPlayers?.length > 0;
     if (responder?.isAI && playerHasJustSayNo(responder)) {
       const actionType = state.pendingAction?.type;
+      // Counter JSN: attacker deciding whether to counter the block
+      if (isCounterJsn) {
+        // AI attacker: always counter if they have a JSN and it's a powerful action
+        const shouldCounter = actionType === 'deal_breaker' || actionType === 'sly_deal' || Math.random() < 0.6;
+        return { action: 'respond_jsn', useJustSayNo: shouldCounter };
+      }
       const shouldBlock = actionType === 'deal_breaker' ||
         actionType === 'sly_deal' ||
         (actionType === 'debt_collector') ||
         (actionType === 'forced_deal') ||
         Math.random() < 0.5;
       return { action: 'respond_jsn', useJustSayNo: shouldBlock };
+    }
+    if (isCounterJsn && responder?.isAI) {
+      return { action: 'respond_jsn', useJustSayNo: false };
     }
     return { action: 'respond_jsn', useJustSayNo: false };
   }
@@ -963,7 +1043,13 @@ export function getAIAction(state: GameState): { action: string; cardId?: string
       if (card.actionType === 'wild_rent' && ownedColors.length > 0) {
         const bestColor = ownedColors.reduce((best: PropertyColor, c: PropertyColor) =>
           getRentAmount(player, c) > getRentAmount(player, best) ? c : best, ownedColors[0]);
-        return { action: 'play_action', cardId: card.id, targetColor: bestColor };
+        // Wild rent charges one player — pick the richest opponent
+        const richestOpponent = state.players
+          .filter(p => p.id !== player.id && getTotalAssetValue(p) > 0)
+          .sort((a, b) => getTotalAssetValue(b) - getTotalAssetValue(a))[0];
+        if (richestOpponent) {
+          return { action: 'play_action', cardId: card.id, targetColor: bestColor, targetPlayerId: richestOpponent.id };
+        }
       }
       if (card.actionType === 'rent' && card.colors) {
         const matchingColors = card.colors.filter(c => player.properties[c].length > 0);
