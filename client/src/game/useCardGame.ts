@@ -19,6 +19,7 @@ import {
   getRentAmount,
   getCompleteSets,
   getTotalAssetValue,
+  cancelPendingAction,
   proposeTrade,
   resolveTradeResponse,
 } from './engine';
@@ -93,6 +94,7 @@ interface CardGameStore extends GameState {
   respondAction: (useJustSayNo: boolean) => void;
   startTrade: (trade: TradeProposal) => void;
   respondTrade: (accepted: boolean) => void;
+  cancelAction: () => void;
   processAITurns: () => void;
   setMultiplayerState: (state: Partial<GameState>, playerIndex: number) => void;
   setMultiplayerWs: (ws: WebSocket | null) => void;
@@ -360,6 +362,18 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
       return;
     }
     const newState = resolveTradeResponse(state, accepted);
+    set(newState);
+    autoSave(newState, false);
+  },
+
+  cancelAction: () => {
+    const state = get();
+    if (state.isMultiplayer) {
+      const newState = cancelPendingAction(state);
+      processAndSyncMultiplayer(newState, get, set);
+      return;
+    }
+    const newState = cancelPendingAction(state);
     set(newState);
     autoSave(newState, false);
   },
