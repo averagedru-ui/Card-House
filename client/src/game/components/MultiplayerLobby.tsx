@@ -35,7 +35,6 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
       setRoomPlayers(players);
     },
     onGameStarted: (gameState, playerIndex) => {
-      setFirebaseMultiplayer(true);
       setMultiplayerState(gameState, playerIndex);
     },
     onGameUpdate: (gameState, playerIndex) => {
