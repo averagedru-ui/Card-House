@@ -23,27 +23,24 @@ function App() {
     }
   }, []);
 
-  // Multiplayer lobby takes priority — stay here until game is fully loaded
-  if (screen === 'multiplayer' || (isMultiplayer && phase === 'menu')) {
-    return <MultiplayerLobby onBack={() => setScreen('home')} />;
-  }
-
-  // Solo game or multiplayer game in progress — need real players loaded
+  // Any active game (solo or multiplayer) with real players → show board
   if (phase !== 'menu' && players.length > 0) {
     return <GameBoard />;
   }
 
-  if (screen === 'rules') {
-    return <RulesScreen onBack={() => setScreen('home')} />;
+  // Multiplayer lobby: show when on multiplayer screen
+  // (isMultiplayer with phase==='menu' means we left a game, reset already happened — don't re-show lobby)
+  if (screen === 'multiplayer') {
+    return (
+      <MultiplayerLobby
+        onBack={() => setScreen('home')}
+      />
+    );
   }
 
-  if (screen === 'profile') {
-    return <ProfileScreen onBack={() => setScreen('home')} />;
-  }
-
-  if (screen === 'quests') {
-    return <QuestScreen onBack={() => setScreen('home')} />;
-  }
+  if (screen === 'rules') return <RulesScreen onBack={() => setScreen('home')} />;
+  if (screen === 'profile') return <ProfileScreen onBack={() => setScreen('home')} />;
+  if (screen === 'quests') return <QuestScreen onBack={() => setScreen('home')} />;
 
   return (
     <CardHouseHome
