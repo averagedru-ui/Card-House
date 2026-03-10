@@ -611,6 +611,8 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   },
 
   setMultiplayerState: (serverState: Partial<GameState>, playerIndex: number) => {
+    // Don't transition if game state isn't fully loaded yet
+    if (!serverState.players || (serverState.players as any[]).length === 0) return;
     set({ ...serverState, myPlayerIndex: playerIndex, isMultiplayer: true } as any);
   },
 
