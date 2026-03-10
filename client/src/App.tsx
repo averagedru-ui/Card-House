@@ -12,6 +12,7 @@ type Screen = 'home' | 'multiplayer' | 'rules' | 'profile' | 'quests';
 function App() {
   const phase = useCardGame(s => s.phase);
   const isMultiplayer = useCardGame(s => s.isMultiplayer);
+  const players = useCardGame(s => s.players);
   const startGame = useCardGame(s => s.startGame);
   const [screen, setScreen] = useState<Screen>('home');
 
@@ -22,12 +23,14 @@ function App() {
     }
   }, []);
 
-  if (phase !== 'menu') {
-    return <GameBoard />;
+  // Multiplayer lobby takes priority — stay here until game is fully loaded
+  if (screen === 'multiplayer' || (isMultiplayer && phase === 'menu')) {
+    return <MultiplayerLobby onBack={() => setScreen('home')} />;
   }
 
-  if (screen === 'multiplayer' || isMultiplayer) {
-    return <MultiplayerLobby onBack={() => setScreen('home')} />;
+  // Solo game or multiplayer game in progress — need real players loaded
+  if (phase !== 'menu' && players.length > 0) {
+    return <GameBoard />;
   }
 
   if (screen === 'rules') {
