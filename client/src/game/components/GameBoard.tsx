@@ -12,7 +12,7 @@ import { GameMenu } from './GameMenu';
 import { ChatPanel } from './ChatPanel';
 import { TableCenter } from './TableCenter';
 import { PropertyColor } from '../types';
-import { getCompleteSets, getTotalBankValue } from '../engine';
+import { getCompleteSets, getTotalBankValue, endTurn } from '../engine';
 
 export const GameBoard: React.FC = () => {
   const phase = useCardGame(s => s.phase);
@@ -28,6 +28,7 @@ export const GameBoard: React.FC = () => {
   const isMultiplayer = useCardGame(s => s.isMultiplayer);
 
   const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const watchdogRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (phase === 'game_over' || isMultiplayer) return;
@@ -66,8 +67,27 @@ export const GameBoard: React.FC = () => {
       }
     }, 800);
 
+    // Watchdog: if AI hasn't advanced after 5s, force end turn
+    watchdogRef.current = setTimeout(() => {
+      const currentState = useCardGame.getState();
+      const currentPlayer = currentState.players[currentState.currentPlayerIndex];
+      if (currentPlayer?.isAI && currentState.phase !== 'game_over' && !currentState.isMultiplayer) {
+        console.warn('[AI Watchdog] AI stuck, force-advancing turn');
+        if (currentState.phase === 'draw') {
+          currentState.draw();
+        } else if (currentState.phase === 'play' || currentState.phase === 'action_target' || currentState.phase === 'forced_deal_pick') {
+          useCardGame.setState(s => ({
+            ...endTurn(s),
+          }));
+        } else {
+          currentState.processAITurns();
+        }
+      }
+    }, 5000);
+
     return () => {
       if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
     };
   }, [phase, currentPlayerIndex, turnNumber, cardsPlayedThisTurn, pendingAction?.currentResponder, pendingAction?.targetPlayerId]);
 
