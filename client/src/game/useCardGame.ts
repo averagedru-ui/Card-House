@@ -508,7 +508,38 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
         if ('needsTarget' in result) {
           if (aiAction.targetPlayerId !== undefined || aiAction.targetColor) {
             const targetId = aiAction.targetPlayerId ?? state.players.find(p => p.id !== player.id)!.id;
-            newState = resolveTargetAction(result.state, targetId, aiAction.targetColor, aiAction.targetCardId);
+            // forced_deal needs offeredProperty set in pendingAction before resolveTargetAction
+            let stateForTarget = result.state;
+            const pendingType = result.state.pendingAction?.type;
+            if (pendingType === 'forced_deal' && aiAction.targetColor) {
+              // Find the card to offer from our own incomplete sets
+              const myCompleteSets = getCompleteSets(player);
+              let offerColor: PropertyColor | null = null;
+              let offerCard = null;
+              for (const color of Object.keys(player.properties) as PropertyColor[]) {
+                if (myCompleteSets.includes(color)) continue;
+                if (player.properties[color].length > 0) {
+                  offerColor = color;
+                  offerCard = player.properties[color][0];
+                  break;
+                }
+              }
+              if (offerColor && offerCard) {
+                stateForTarget = {
+                  ...result.state,
+                  pendingAction: {
+                    ...result.state.pendingAction!,
+                    offeredProperty: { color: offerColor, card: offerCard },
+                  },
+                } as any;
+              } else {
+                // No property to offer — just end turn
+                newState = endTurn(result.state);
+                set(newState);
+                break;
+              }
+            }
+            newState = resolveTargetAction(stateForTarget, targetId, aiAction.targetColor, aiAction.targetCardId);
             set(newState);
           } else {
             const rentCard = result.state.pendingAction?.card;
@@ -611,8 +642,7 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   },
 
   setMultiplayerState: (serverState: Partial<GameState>, playerIndex: number) => {
-    // Don't transition if game state isn't fully loaded yet
-    if (!serverState.players || (serverState.players as any[]).length === 0) return;
+    if (!serverState.players) return;
     set({ ...serverState, myPlayerIndex: playerIndex, isMultiplayer: true } as any);
   },
 
