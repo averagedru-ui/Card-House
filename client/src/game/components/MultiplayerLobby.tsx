@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useCardGame } from '../useCardGame';
 import {
   createRoom as fbCreateRoom,
   joinRoom as fbJoinRoom,
+  rejoinRoom as fbRejoinRoom,
   leaveRoom as fbLeaveRoom,
   startGame as fbStartGame,
   getCurrentRoomId,
@@ -26,34 +27,35 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   const [roomPlayers, setRoomPlayers] = useState<string[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [copied, setCopied] = useState(false);
-  const setFirebaseMultiplayer = useCardGame(s => s.setFirebaseMultiplayer);
+
   const setMultiplayerState = useCardGame(s => s.setMultiplayerState);
   const addChatMessage = useCardGame(s => s.addChatMessage);
 
-  const callbacks: FirebaseCallbacks = {
-    onPlayersChanged: (players) => {
-      setRoomPlayers(players);
-    },
-    onGameStarted: (gameState, playerIndex) => {
-      setMultiplayerState(gameState, playerIndex);
-    },
-    onGameUpdate: (gameState, playerIndex) => {
-      setMultiplayerState(gameState, playerIndex);
-    },
-    onChatMessage: (msg) => {
-      addChatMessage({ sender: msg.sender, text: msg.text, timestamp: msg.timestamp });
-    },
-    onError: (message) => {
-      setError(message);
-      setStatus('error');
-    },
-    onPlayerLeft: (players, leftPlayer) => {
-      setRoomPlayers(players);
-    },
-    onHostChanged: (newIsHost) => {
-      setIsHost(newIsHost);
-    },
-  };
+  // Stable refs so Firebase listeners never hold stale closures
+  const setMultiplayerStateRef = useRef(setMultiplayerState);
+  const addChatMessageRef = useRef(addChatMessage);
+  setMultiplayerStateRef.current = setMultiplayerState;
+  addChatMessageRef.current = addChatMessage;
+
+  const setRoomPlayersRef = useRef(setRoomPlayers);
+  const setErrorRef = useRef(setError);
+  const setStatusRef = useRef(setStatus);
+  const setIsHostRef = useRef(setIsHost);
+  setRoomPlayersRef.current = setRoomPlayers;
+  setErrorRef.current = setError;
+  setStatusRef.current = setStatus;
+  setIsHostRef.current = setIsHost;
+
+  // Stable callbacks object — never recreated
+  const callbacks = useRef<FirebaseCallbacks>({
+    onPlayersChanged: (players) => setRoomPlayersRef.current(players),
+    onGameStarted: (gameState, playerIndex) => setMultiplayerStateRef.current(gameState, playerIndex),
+    onGameUpdate: (gameState, playerIndex) => setMultiplayerStateRef.current(gameState, playerIndex),
+    onChatMessage: (msg) => addChatMessageRef.current({ sender: msg.sender, text: msg.text, timestamp: msg.timestamp }),
+    onError: (message) => { setErrorRef.current(message); setStatusRef.current('error'); },
+    onPlayerLeft: (players) => setRoomPlayersRef.current(players),
+    onHostChanged: (newIsHost) => setIsHostRef.current(newIsHost),
+  }).current;
 
   const statusRef = useRef(status);
   statusRef.current = status;
@@ -61,9 +63,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
-    if (room) {
-      setJoinCode(room);
-    }
+    if (room) setJoinCode(room);
     return () => {
       if (statusRef.current === 'waiting' && getCurrentRoomId()) {
         fbLeaveRoom();
@@ -72,37 +72,24 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
   }, []);
 
   const handleCreateRoom = async () => {
-    if (!playerName.trim()) {
-      setError('Enter your name');
-      return;
-    }
+    if (!playerName.trim()) { setError('Enter your name'); return; }
     setStatus('creating');
     setError('');
     try {
-      const code = await fbCreateRoom(
-        playerName.trim(),
-        password.trim() || null,
-        callbacks
-      );
+      const code = await fbCreateRoom(playerName.trim(), password.trim() || null, callbacks);
       setRoomId(code);
       setIsHost(true);
       setRoomHasPassword(!!password.trim());
       setStatus('waiting');
-    } catch (err) {
+    } catch {
       setError('Failed to create room');
       setStatus('error');
     }
   };
 
   const handleJoinRoom = async () => {
-    if (!playerName.trim()) {
-      setError('Enter your name');
-      return;
-    }
-    if (!joinCode.trim()) {
-      setError('Enter a room code');
-      return;
-    }
+    if (!playerName.trim()) { setError('Enter your name'); return; }
+    if (!joinCode.trim()) { setError('Enter a room code'); return; }
     setStatus('joining');
     setError('');
     try {
@@ -119,8 +106,33 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
       } else {
         setStatus('idle');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to join room');
+      setStatus('error');
+    }
+  };
+
+  const handleRejoinRoom = async () => {
+    if (!playerName.trim()) { setError('Enter your name'); return; }
+    if (!joinCode.trim()) { setError('Enter a room code'); return; }
+    setStatus('joining');
+    setError('');
+    try {
+      const result = await fbRejoinRoom(
+        joinCode.trim().toUpperCase(),
+        playerName.trim(),
+        callbacks
+      );
+      if (result.success) {
+        setRoomId(joinCode.trim().toUpperCase());
+        setIsHost(result.isHost);
+        setStatus('waiting');
+      } else {
+        setError(result.error || 'Could not rejoin');
+        setStatus('error');
+      }
+    } catch {
+      setError('Failed to rejoin room');
       setStatus('error');
     }
   };
@@ -160,9 +172,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
 
           <button onClick={copyLink}
             className={`w-full py-3 rounded-xl font-bold text-sm mb-4 transition-all ${
-              copied
-                ? 'bg-green-600 text-white'
-                : 'bg-indigo-600 text-white hover:bg-indigo-500'
+              copied ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'
             }`}>
             {copied ? 'Link Copied!' : 'Copy Invite Link'}
           </button>
@@ -268,7 +278,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
             <button onClick={handleJoinRoom}
               disabled={status === 'joining'}
               className="px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all">
-              Join
+              {status === 'joining' ? '...' : 'Join'}
             </button>
           </div>
           <input
@@ -279,6 +289,11 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ onBack }) =>
             placeholder="Room password (if required)"
             className="w-full px-4 py-3 rounded-xl bg-gray-700 border border-gray-600 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none transition-colors"
           />
+          <button onClick={handleRejoinRoom}
+            disabled={status === 'joining'}
+            className="w-full py-2 text-indigo-400 text-sm hover:text-indigo-300 transition-colors underline-offset-2 hover:underline">
+            Rejoin an existing lobby
+          </button>
         </div>
 
         <button onClick={onBack}
