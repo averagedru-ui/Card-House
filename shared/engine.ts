@@ -141,6 +141,22 @@ function transitionToPayOrResponse(state: GameState): GameState {
     return state;
   }
 
+  // If responder has nothing to pay, auto-skip them
+  const hasAssets = responder.bank.length > 0 ||
+    Object.values(responder.properties).some((cards: any) => cards.length > 0);
+  if (!hasAssets) {
+    addLog(state, `${responder.name} has nothing to pay`, 'rent');
+    if (state.pendingAction!.respondingPlayers) {
+      const idx = state.pendingAction!.respondingPlayers!.indexOf(responderId);
+      if (idx !== -1) state.pendingAction!.respondingPlayers!.splice(idx, 1);
+      if (state.pendingAction!.respondingPlayers!.length > 0) {
+        state.pendingAction!.currentResponder = state.pendingAction!.respondingPlayers![0];
+        return transitionToPayOrResponse(state);
+      }
+    }
+    return returnToPlay(state);
+  }
+
   state.phase = 'pay_debt';
   state.message = responder.isAI
     ? `${responder.name} must pay $${state.pendingAction!.amount}M...`
