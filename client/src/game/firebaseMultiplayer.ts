@@ -358,6 +358,12 @@ function replaceUndefined(obj: any): any {
   return obj;
 }
 
+// All property colors that must exist on every player
+const ALL_PROPERTY_COLORS = [
+  'brown', 'blue', 'green', 'red', 'yellow',
+  'orange', 'pink', 'teal', 'purple', 'black',
+];
+
 function deserializeGameState(data: any): GameState | null {
   try {
     if (!data || !data.players || !data.phase) return null;
@@ -369,19 +375,32 @@ function deserializeGameState(data: any): GameState | null {
     for (const player of data.players) {
       if (player.hand && !Array.isArray(player.hand)) {
         player.hand = Object.values(player.hand);
+      } else if (!player.hand) {
+        player.hand = [];
       }
       if (player.bank && !Array.isArray(player.bank)) {
         player.bank = Object.values(player.bank);
+      } else if (!player.bank) {
+        player.bank = [];
       }
-      if (player.properties) {
-        for (const color of Object.keys(player.properties)) {
-          if (player.properties[color] && !Array.isArray(player.properties[color])) {
-            player.properties[color] = Object.values(player.properties[color]);
-          }
-          if (!player.properties[color]) {
-            player.properties[color] = [];
-          }
+
+      // Ensure properties object exists
+      if (!player.properties) player.properties = {};
+      // Firebase drops empty arrays — restore ALL color keys
+      for (const color of ALL_PROPERTY_COLORS) {
+        if (!player.properties[color]) {
+          player.properties[color] = [];
+        } else if (!Array.isArray(player.properties[color])) {
+          player.properties[color] = Object.values(player.properties[color]);
         }
+      }
+
+      // Ensure hasHouse and hasHotel exist for all colors
+      if (!player.hasHouse) player.hasHouse = {};
+      if (!player.hasHotel) player.hasHotel = {};
+      for (const color of ALL_PROPERTY_COLORS) {
+        if (player.hasHouse[color] === undefined) player.hasHouse[color] = false;
+        if (player.hasHotel[color] === undefined) player.hasHotel[color] = false;
       }
     }
 
