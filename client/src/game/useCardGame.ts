@@ -30,6 +30,7 @@ import {
   sendGameAction,
   sendChatMessage as fbSendChat,
   leaveRoom as fbLeaveRoom,
+  softDisconnect as fbSoftDisconnect,
   isConnected as fbIsConnected,
   getCurrentRoomId as fbGetCurrentRoomId,
 } from './firebaseMultiplayer';
@@ -750,8 +751,14 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
       state.multiplayerWs.close();
     }
     if (state.isMultiplayer && fbIsConnected()) {
-      if (clearMPSave) clearMPSession();
-      fbLeaveRoom();
+      if (clearMPSave) {
+        // Explicitly quitting — delete from Firebase
+        clearMPSession();
+        fbLeaveRoom();
+      } else {
+        // Saving to resume later — just stop listening, keep Firebase room alive
+        fbSoftDisconnect();
+      }
     }
     set({
       phase: 'menu',
