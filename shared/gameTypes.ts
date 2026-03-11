@@ -108,6 +108,7 @@ export interface GameState {
   cardsPlayedThisTurn: number;
   pendingAction: PendingAction | null;
   pendingTrade: TradeProposal | null;
+  pendingDoubleRent: number;
   winner: number | null;
   turnNumber: number;
   message: string;
