@@ -53,6 +53,7 @@ export const PlayerHand: React.FC = () => {
 
   if (!player) return null;
 
+  const pendingDoubleRent = useCardGame(s => (s as any).pendingDoubleRent || 0);
   const isMyTurn = currentPlayerIndex === myPlayerIndex;
   const canPlay = isMyTurn && phase === 'play';
   const mustDiscard = isMyTurn && phase === 'discard';
@@ -123,6 +124,12 @@ export const PlayerHand: React.FC = () => {
 
   return (
     <div className="bg-gray-900/95 border-t border-gray-700/50 pb-[env(safe-area-inset-bottom)] pt-1.5 px-2">
+      {canPlay && pendingDoubleRent > 0 && (
+        <div className="flex items-center justify-center gap-1.5 mb-1 px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg">
+          <span className="text-lg">⚡</span>
+          <span className="text-yellow-400 text-xs font-bold">Double Rent active — play a Rent card!</span>
+        </div>
+      )}
       {canPlay && (
         <div className="flex gap-1.5 justify-center mb-1.5 flex-wrap">
           <AnimatePresence>
@@ -228,6 +235,7 @@ export const PlayerHand: React.FC = () => {
                     onClick={() => handleCardClick(card, i)}
                     selected={isSelected}
                     disabled={!canPlay && !mustDiscard}
+                    style={pendingDoubleRent > 0 && card.actionType === 'rent' ? { boxShadow: '0 0 10px 2px rgba(234,179,8,0.6)' } : undefined}
                     small
                   />
                 </motion.div>
