@@ -67,20 +67,22 @@ export const GameBoard: React.FC = () => {
       }
     }, 800);
 
-    // Watchdog: if AI hasn't advanced after 5s, force end turn
+    // Watchdog: if AI hasn't advanced after 5s, force un-stick
     watchdogRef.current = setTimeout(() => {
-      const currentState = useCardGame.getState();
-      const currentPlayer = currentState.players[currentState.currentPlayerIndex];
-      if (currentPlayer?.isAI && currentState.phase !== 'game_over' && !currentState.isMultiplayer) {
-        console.warn('[AI Watchdog] AI stuck, force-advancing turn');
-        if (currentState.phase === 'draw') {
-          currentState.draw();
-        } else if (currentState.phase === 'play' || currentState.phase === 'action_target' || currentState.phase === 'forced_deal_pick') {
-          useCardGame.setState(s => ({
-            ...endTurn(s),
-          }));
+      const s = useCardGame.getState();
+      if (s.phase === 'game_over' || s.isMultiplayer) return;
+      const isAIStuck =
+        (s.phase === 'pay_debt' && s.players.find(p => p.id === s.pendingAction?.currentResponder)?.isAI) ||
+        (s.phase === 'action_response' && s.players.find(p => p.id === s.pendingAction?.targetPlayerId)?.isAI) ||
+        s.players[s.currentPlayerIndex]?.isAI;
+      if (isAIStuck) {
+        console.warn('[Watchdog] AI stuck at:', s.phase, '— forcing advance');
+        if (s.phase === 'draw') {
+          s.draw();
+        } else if (s.phase === 'pay_debt' || s.phase === 'action_response') {
+          s.processAITurns();
         } else {
-          currentState.processAITurns();
+          useCardGame.setState(st => ({ ...endTurn(st) }));
         }
       }
     }, 5000);
@@ -89,7 +91,7 @@ export const GameBoard: React.FC = () => {
       if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
       if (watchdogRef.current) clearTimeout(watchdogRef.current);
     };
-  }, [phase, currentPlayerIndex, turnNumber, cardsPlayedThisTurn, pendingAction?.currentResponder, pendingAction?.targetPlayerId]);
+  }, [phase, currentPlayerIndex, turnNumber, cardsPlayedThisTurn, pendingAction?.currentResponder, pendingAction?.targetPlayerId, pendingAction?.respondingPlayers?.length]);
 
   if (phase === 'game_over') {
     return <GameOverScreen />;
