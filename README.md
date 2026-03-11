@@ -1,2 +1,0 @@
-Hello!
-Thanks for playing! 
