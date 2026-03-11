@@ -326,6 +326,17 @@ export async function leaveRoom(): Promise<void> {
   cleanup();
 }
 
+// Soft disconnect: stop listening but keep the Firebase room intact.
+// Used when a player pauses/saves and wants to resume later.
+export function softDisconnect(): void {
+  for (const unsub of unsubscribers) {
+    unsub();
+  }
+  unsubscribers = [];
+  // Keep currentRoomId, currentSessionId, currentPlayerIndex intact
+  // so resume can re-use them if needed
+}
+
 export function getCurrentPlayerIndex(): number {
   return currentPlayerIndex;
 }
