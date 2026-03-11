@@ -417,6 +417,20 @@ function deserializeGameState(data: any): GameState | null {
       data.gameLog = [];
     }
 
+    // Fix pendingAction arrays that Firebase converts to keyed objects
+    if (data.pendingAction) {
+      const pa = data.pendingAction;
+      if (pa.respondingPlayers && !Array.isArray(pa.respondingPlayers)) {
+        pa.respondingPlayers = Object.values(pa.respondingPlayers);
+      }
+      if (pa.blockedPlayers && !Array.isArray(pa.blockedPlayers)) {
+        pa.blockedPlayers = Object.values(pa.blockedPlayers);
+      }
+      if (pa.pendingTargets && !Array.isArray(pa.pendingTargets)) {
+        pa.pendingTargets = Object.values(pa.pendingTargets);
+      }
+    }
+
     return data as GameState;
   } catch {
     return null;
@@ -484,4 +498,51 @@ export async function rejoinRoom(
   }
 
   return { success: false, isHost: false, error: 'Could not join room' };
+}
+
+export async function resumeMultiplayerGame(
+  roomCode: string,
+  playerName: string,
+  playerIndex: number,
+  callbacks: FirebaseCallbacks
+): Promise<{ success: boolean; error?: string }> {
+  // Clean up any existing listeners first
+  cleanup();
+
+  const roomRef = ref(db, `rooms/${roomCode}`);
+  const snapshot = await get(roomRef);
+
+  if (!snapshot.exists()) {
+    return { success: false, error: 'Room no longer exists' };
+  }
+
+  const roomData = snapshot.val() as FirebaseRoom;
+
+  if (!roomData.isStarted || !roomData.gameState) {
+    return { success: false, error: 'Game has not started yet' };
+  }
+
+  // Re-register as this player
+  const sessionId = generateSessionId();
+  currentRoomId = roomCode;
+  currentSessionId = sessionId;
+  currentPlayerName = playerName;
+  currentPlayerIndex = playerIndex;
+
+  // Update our session in Firebase so others see us as reconnected
+  const playersSnap = await get(ref(db, `rooms/${roomCode}/players`));
+  if (playersSnap.exists()) {
+    const players = playersSnap.val();
+    for (const [key, p] of Object.entries(players)) {
+      const player = p as { name: string; index: number; sessionId: string };
+      if (player.name === playerName || player.index === playerIndex) {
+        await set(ref(db, `rooms/${roomCode}/players/${key}/sessionId`), sessionId);
+        onDisconnect(ref(db, `rooms/${roomCode}/players/${key}`)).remove();
+        break;
+      }
+    }
+  }
+
+  setupRoomListeners(roomCode, sessionId, callbacks);
+  return { success: true };
 }
