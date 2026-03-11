@@ -244,5 +244,4 @@ export const GameBoard: React.FC = () => {
       <ActionPanel />
     </div>
   );
-  );
 };
