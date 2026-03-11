@@ -386,7 +386,7 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
       const completeSets = getCompleteSets(player).filter(c => !NO_HOUSE_HOTEL_COLORS.includes(c));
       const eligible = completeSets.filter((c: PropertyColor) => !player.hasHouse[c]);
       if (eligible.length === 0) {
-        newState.message = 'No eligible complete sets to add a house to! (Railroads and Utilities cannot have houses)';
+        newState.message = '⚠️ No complete sets eligible for a house!';
         return newState;
       }
       player.hand.splice(cardIndex, 1);
@@ -413,7 +413,7 @@ export function playActionCard(state: GameState, cardId: string): GameState | { 
       const completeSetsH = getCompleteSets(player).filter(c => !NO_HOUSE_HOTEL_COLORS.includes(c));
       const eligibleH = completeSetsH.filter((c: PropertyColor) => player.hasHouse[c] && !player.hasHotel[c]);
       if (eligibleH.length === 0) {
-        newState.message = 'No sets with houses to add a hotel to! (Railroads and Utilities cannot have hotels)';
+        newState.message = '⚠️ No sets with houses to add a hotel to!';
         return newState;
       }
       player.hand.splice(cardIndex, 1);
