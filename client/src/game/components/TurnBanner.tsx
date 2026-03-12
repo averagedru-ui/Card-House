@@ -29,23 +29,23 @@ export const TurnBanner: React.FC = () => {
     <AnimatePresence>
       {showBanner && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: -50 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.8, y: -50 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed top-1/3 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.25 }}
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
         >
-          <div className={`px-8 py-4 rounded-2xl shadow-2xl ${
+          <div className={`px-4 py-1.5 rounded-xl shadow-lg ${
             isMyTurn
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-indigo-500/30'
-              : 'bg-gradient-to-r from-gray-700 to-gray-800 shadow-gray-900/50'
+              ? 'bg-indigo-600/90 shadow-indigo-500/30'
+              : 'bg-gray-700/90 shadow-gray-900/50'
           }`}>
-            <div className={`text-2xl md:text-3xl font-black text-center ${
-              isMyTurn ? 'text-white' : 'text-gray-300'
+            <div className={`text-sm font-bold text-center ${
+              isMyTurn ? 'text-white' : 'text-gray-200'
             }`}>
-              {isMyTurn ? 'Your Turn!' : `${currentPlayer.name}'s Turn`}
+              {isMyTurn ? '⚡ Your Turn!' : `${currentPlayer.name}'s Turn`}
             </div>
-            <div className="text-center text-sm mt-1 text-white/60">
+            <div className="text-center text-[10px] text-white/50">
               Turn {turnNumber}
             </div>
           </div>
