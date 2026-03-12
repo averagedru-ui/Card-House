@@ -96,14 +96,18 @@ export const PlayerHand: React.FC = () => {
 
   const handlePlayAction = () => {
     if (!selectedCard) return;
-    // Double Rent: show picker to immediately select which rent card to pair it with
+    // Double Rent: only playable if you have a rent card to pair it with
     if (selectedCard.actionType === 'double_rent') {
-      const rentCards = player.hand.filter(c => c.actionType === 'rent' || c.actionType === 'wild_rent');
-      if (rentCards.length > 0) {
-        setShowDoubleRentPicker(true);
+      const rentCards = player.hand.filter(c => (c.actionType === 'rent' || c.actionType === 'wild_rent') && c.id !== selectedCard.id);
+      if (rentCards.length === 0) {
+        // Can't play Double Rent without a Rent card — deselect and show message
+        setSelectedCard(null);
+        setExpandedIndex(null);
+        useCardGame.setState({ message: "⚠️ You need a Rent card in hand to play Double Rent!" });
         return;
       }
-      // No rent cards in hand — just play it as a standalone (next turn's rent)
+      setShowDoubleRentPicker(true);
+      return;
     }
     playAction(selectedCard.id);
     setSelectedCard(null);
