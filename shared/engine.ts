@@ -644,6 +644,17 @@ export function resolveTargetAction(state: GameState, targetPlayerId: number, ta
     case 'deal_breaker': {
       if (!targetColor) return state;
       if (playerHasJustSayNo(target)) {
+        // If target is AI, resolve JSN immediately instead of waiting for UI
+        if (target.isAI) {
+          const jsnIdx = target.hand.findIndex((c: Card) => c.actionType === 'just_say_no');
+          if (jsnIdx !== -1) {
+            const jsnCard = target.hand.splice(jsnIdx, 1)[0];
+            newState.discardPile.push(jsnCard);
+            addLog(newState, `${target.name} blocks Deal Breaker with Just Say No!`, 'action');
+            newState.pendingAction = null;
+            return returnToPlay(newState);
+          }
+        }
         newState.phase = 'action_response';
         newState.pendingAction!.targetPlayerId = targetPlayerId;
         newState.pendingAction!.pendingTargets = [{ playerId: targetPlayerId, color: targetColor }];
