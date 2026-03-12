@@ -46,7 +46,11 @@ export const ChatPanel: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-8 h-8 bg-indigo-600 active:bg-indigo-500 rounded-xl flex items-center justify-center"
+        className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+          unread > 0
+            ? 'bg-indigo-500 animate-pulse shadow-lg shadow-indigo-500/50'
+            : 'bg-indigo-600 active:bg-indigo-500'
+        }`}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
