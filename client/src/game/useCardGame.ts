@@ -155,7 +155,7 @@ let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function autoSave(state: GameState, isMultiplayer: boolean) {
   if (isMultiplayer) return;
-  if (state.phase === 'menu' || state.phase === 'game_over') return;
+  if (state.phase === 'menu' || state.phase === 'game_over' || state.winner != null) return;
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     saveToLocalStorage(state);
@@ -687,6 +687,11 @@ export const useCardGame = create<CardGameStore>((set, get) => ({
   setMultiplayerState: (serverState: Partial<GameState>, playerIndex: number) => {
     if (!serverState.players) return;
     set({ ...serverState, myPlayerIndex: playerIndex, isMultiplayer: true } as any);
+    // If game is over, clear the saved session so resume is never offered
+    if (serverState.phase === 'game_over' || serverState.winner != null) {
+      clearMPSession();
+      return;
+    }
     // Persist MP session so player can resume if they disconnect
     const roomCode = fbGetCurrentRoomId();
     const playerName = serverState.players[playerIndex]?.name || '';
