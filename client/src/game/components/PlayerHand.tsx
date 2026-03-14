@@ -147,40 +147,24 @@ export const PlayerHand: React.FC = () => {
           <div className="flex flex-col gap-2">
             {rentCards.map(card => (
               <button key={card.id}
-                onClick={() => {
+                onPointerDown={() => {
                   setShowDoubleRentPicker(false);
-                  // Play double rent first, then immediately play the rent card
-                  playAction(selectedCard.id);
-                  setTimeout(() => {
-                    playAction(card.id);
-                  }, 50);
                   setSelectedCard(null);
                   setExpandedIndex(null);
+                  // Play Double Rent first (sets the pendingDoubleRent flag), then the Rent card
+                  playAction(selectedCard.id);
+                  setTimeout(() => { playAction(card.id); }, 80);
                 }}
-                className="py-2.5 px-4 rounded-xl bg-yellow-600 text-white font-semibold hover:bg-yellow-500 active:scale-95 text-sm transition-all">
+                className="py-3 px-4 rounded-xl bg-yellow-600 text-white font-semibold text-sm">
                 {card.name}
               </button>
             ))}
-            {rentCards.length === 0 && (
-              <p className="text-gray-400 text-sm">No Rent cards in hand! Playing Double Rent alone — it will apply to your next Rent card this turn.</p>
-            )}
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={() => setShowDoubleRentPicker(false)}
-              className="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600">
+            <button onPointerDown={() => setShowDoubleRentPicker(false)}
+              className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg text-sm font-semibold">
               Cancel
             </button>
-            {rentCards.length === 0 && (
-              <button onClick={() => {
-                setShowDoubleRentPicker(false);
-                playAction(selectedCard.id);
-                setSelectedCard(null);
-                setExpandedIndex(null);
-              }}
-                className="flex-1 py-2 bg-yellow-600 text-white rounded-lg text-sm font-bold hover:bg-yellow-500">
-                Play Anyway
-              </button>
-            )}
           </div>
         </div>
       </div>
